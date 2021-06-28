@@ -2,7 +2,7 @@
 
 Sports Info Solutions (SIS) is hosting a Football Analytics Challenge to raise money for the Boys and Girls Clubs of America.  All donations are appreciated and go to charity.
 
-Learn more about the competition [here](http://www.sportsinfosolutions.com/sports-info-solutions-to-host-football-analytics-challenge-to-raise-money-for-the-united-negro-college-fund/).
+Learn more about the competition [here](https://www.sportsinfosolutions.com/sports-info-solutions-to-host-2nd-annual-sports-analytics-challenge-to-raise-money-for-the-boys-and-girls-clubs-of-america/).
 
 Visit this [link](https://docs.google.com/forms/d/e/1FAIpQLSdhqkO_a06yJDVL3f9G-LdI2TS4xwqVGMcueUL_LzdHkiQDWg/viewform?usp=sf_link) to register for the Football Analytics Challenge; a minimum $1 donation is required for entry.
 
