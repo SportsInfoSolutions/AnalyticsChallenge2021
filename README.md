@@ -4,11 +4,9 @@ Sports Info Solutions (SIS) is hosting a Football Analytics Challenge to raise m
 
 Learn more about the competition [here](http://www.sportsinfosolutions.com/sports-info-solutions-to-host-football-analytics-challenge-to-raise-money-for-the-united-negro-college-fund/).
 
-Visit this [link](https://docs.google.com/forms/d/e/1FAIpQLSf_dRn9aciVg35AMFHj3VgRt8N6v8RqjHV20XVuHsDf6GkzgQ/viewform) to register for the Football Analytics Challenge; a minimum $1 donation is required for entry.
+Visit this [link](https://docs.google.com/forms/d/e/1FAIpQLSdhqkO_a06yJDVL3f9G-LdI2TS4xwqVGMcueUL_LzdHkiQDWg/viewform?usp=sf_link) to register for the Football Analytics Challenge; a minimum $1 donation is required for entry.
 
-To familiarize yourself with the data that you will be working with, check out this [article](https://sportsinfosolutionsblog.com/2020/06/24/a-quick-introduction-to-our-analytics-challenge-data-set/).
-
-To download the data: navigate to the Data folder, click on AnalyticsChallenge2020Data.csv, simultaneously press ALT + Left Click on 'View Raw' or click 'Download'.
+Data is available in the Data folder, with a Data Dictionary file to explain the use of the files and some of the columns.
 
 ## Sports Info Solutions Football Analytics Challenge Rules
  
@@ -22,7 +20,7 @@ After registering, participants will retrieve contest dataset through GitHub and
 Participants authorized to use any additional data that is both free and publicly available. Participants must identify and cite data that goes beyond supplied contest data.
  
 ### Competition Timeline
-Start Date: June 30, 2021
+Start Date: June 28, 2021
 Entry Deadline (Final Submission Deadline): July 25, 2021 11:59 PM ET
 Preliminary Judging Results: July 30, 2021
 Final Judging Panel: August 4, 2021 (live video call)
@@ -59,7 +57,7 @@ For example: How are you defining the different route combinations you’re cons
 • Other Data Sources — We are in a golden age of football analytics. Feel free to use other free, publicly available resources to aid in your analysis. You must provide details on any resources that you used outside the provided data, and it must be clear from your discussion what that data was used for. Of course, this competition is centered around the data provided, so don’t lean too heavily on other resources for your key conclusions.
  
 ### Notification
-The finalists will be notified of their progress via email by July 30th, 2021. If a finalist does not respond to the notification attempt within three (3) days from the first notification attempt, then an alternate finalist will be selected from among the eligible entrant pool.
+The finalists will be notified of their progress via email by July 30th, 2021. If a finalist does not respond to the notification attempt within 48 hours from the first notification attempt, then an alternate finalist will be selected from among the eligible entrant pool.
  
 ### Eligibility
 To be deemed eligible, participants must submit a monetary donation of no less than $1 to the affiliated donation collection on GoFundMe and must register via the competition website. There are no geographic restrictions, but work must be submitted in English.
@@ -72,7 +70,7 @@ This is a charity event with all proceeds donated to the Boys and Girls Clubs of
 The contest dataset provided by Sports Info Solutions shall not be used for any purposes beyond this competition. Participants may not distribute, sell, transmit, brand, publish, copy, sublicense, reproduce, or transfer any of the contest data at any time during or after the competition without the prior written permission of SIS.
 
 ### Intellectual Property
-Participants shall retain all Intellectual Property rights to their Intellectual Property, including publishing the results of their research on any platform they wish. Sports Info Solutions retains the right to use Participant research and results on their website and in media in perpetuity at no cost, including work and models throughout future NFL Seasons and Offseasons.
+Participants shall retain all Intellectual Property rights to their Intellectual Property, including publishing the results of their research on any platform they wish. For avoidance of doubt, Participants may not share the underlying data under any circumstances. Sports Info Solutions retains the right to use Participant research and results on their website and in media in perpetuity at no cost, including work and models throughout future NFL Seasons and Offseasons.
 
  
 ### ENTRY IN THIS COMPETITION CONSTITUTES YOUR ACCEPTANCE OF THESE OFFICIAL COMPETITION RULES.
