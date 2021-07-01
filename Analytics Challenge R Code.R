@@ -14,6 +14,14 @@ skills$Order_OutsideToInside <- as.integer(skills$Order_OutsideToInside)
 skills %>% 
   filter(OnFieldPosition=="B" & grepl("Right|Left", Route))
 
+skills %>% 
+  group_by(GameID, EventID)
+  mutate(SideOfCenter2 = case_when(OnFieldPosition=="B" & grepl("Right", Route) ~ "R",
+                                   OnFieldPosition=="B" & grepl("Left", Route) ~ "L",
+                                   TRUE ~ SideOfCenter),
+         )
+  
+
 unique(skills$OnFieldPosition)
 
 skills %>% 
@@ -116,8 +124,11 @@ skills %>%
   select(OnFieldPosition, StrengthInd, OrderID, Formation, Strength, Route, IsBlocking, AlignOrder) %>% 
   filter(Route=="Curl") %>% 
   group_by(AlignOrder) %>% 
-  summarise(count = n()) %>% 
-  arrange(-count)
+  summarise(count = n(),
+            perc = count) %>% 
+  arrange(-count) %>% 
+  ungroup() %>% 
+  mutate(perc = count/sum(count))
 
 curlPlays <- skills %>% 
   inner_join(formation_info, by=c("GameID", "EventID")) %>% 
@@ -159,4 +170,58 @@ skills %>%
   summarise(count = n()) %>% 
   arrange(-count)
 
-  
+
+
+outsideCurlPlays <- skills %>% 
+  inner_join(formation_info, by=c("GameID", "EventID")) %>% 
+  inner_join(passIDs) %>% 
+  filter(OnFieldPosition!="QB") %>% 
+  ungroup() %>% 
+  mutate(StrengthInd = case_when(SideOfCenter==Strength ~ "Strong",
+                                 SideOfCenter!=Strength & Strength!="Balanced" & OnFieldPosition!="B"~ "WeakA",
+                                 OnFieldPosition=="B" ~ "WeakBackfield",
+                                 Strength=="Balanced" & SideOfCenter=="R" ~ "Strong",
+                                 Strength=="Balanced" & SideOfCenter=="L" ~ "WeakA")) %>% 
+  group_by(GameID, EventID, OnFieldPosition) %>% 
+  mutate(OrderID = ifelse(OnFieldPosition=="B", row_number(), Order_OutsideToInside),
+         AlignOrder = paste0(StrengthInd, OrderID)) %>% 
+  select(OnFieldPosition, StrengthInd, OrderID, Formation, Strength, Route, IsBlocking, AlignOrder )%>% 
+  filter(Route=="Curl" & AlignOrder=="Strong1") %>% 
+  ungroup() %>% 
+  select(GameID, EventID) %>% 
+  distinct(GameID, EventID)
+
+
+skills %>% 
+  inner_join(formation_info, by=c("GameID", "EventID")) %>% 
+  inner_join(passIDs) %>% 
+  filter(OnFieldPosition!="QB") %>% 
+  ungroup() %>% 
+  mutate(StrengthInd = case_when(SideOfCenter==Strength ~ "Strong",
+                                 SideOfCenter!=Strength & Strength!="Balanced" & OnFieldPosition!="B"~ "WeakA",
+                                 OnFieldPosition=="B" ~ "WeakBackfield",
+                                 Strength=="Balanced" & SideOfCenter=="R" ~ "Strong",
+                                 Strength=="Balanced" & SideOfCenter=="L" ~ "WeakA")) %>% 
+  group_by(GameID, EventID, OnFieldPosition) %>% 
+  mutate(OrderID = ifelse(OnFieldPosition=="B", row_number(), Order_OutsideToInside),
+         AlignOrder = paste0(StrengthInd, OrderID)) %>% 
+  select(OnFieldPosition, StrengthInd, OrderID, Formation, Strength, Route, IsBlocking, AlignOrder) %>% 
+  inner_join(outsideCurlPlays) %>% 
+  filter(!Route %in% c("Curl", "Blocking", "NULL")) %>% 
+  group_by(AlignOrder, Route) %>% 
+  summarise(count = n()) %>% 
+  arrange(-count)
+
+
+
+skills %>% 
+  filter(Route!="NULL" & Route!="Blocking") %>% 
+  group_by(GameID, EventID, Route) %>% 
+  summarise(RouteCount = n()) %>% 
+  group_by(Route) %>% 
+  summarise(TotalRoutes = sum(RouteCount),
+            UniquePlays = sum(ifelse(RouteCount > 0, 1, 0)),
+            PlaysWithMoreThan1 = sum(ifelse(RouteCount > 1, 1, 0))/UniquePlays) %>% 
+  arrange(-UniquePlays)
+
+
