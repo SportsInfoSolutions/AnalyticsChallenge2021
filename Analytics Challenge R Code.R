@@ -1,10 +1,22 @@
 library(tidyverse)
+library(tidytext)
 
 pbp <- read_csv("Data/PlayByPlay.csv")
 
 unique(pbp$CoverageScheme)
+unique(pbp$Hash)
+pbp %>% 
+  filter(grepl("pass", EventType)) %>% 
+  inner_join(formation_info) %>% 
+  group_by(Formation,Hash) %>% 
+  summarise(count = n()) %>% 
+  group_by(Formation) %>% 
+  mutate(perc = count/sum(count))
 
 skills <- read_csv("Data/SkillPositionPlayers.csv")
+
+skills %>% 
+  filter(SideOfCenter=="R" & Route == "Flat - Left")
 
 unique(skills$SideOfCenter)
 
@@ -14,26 +26,32 @@ skills$Order_OutsideToInside <- as.integer(skills$Order_OutsideToInside)
 skills %>% 
   filter(OnFieldPosition=="B" & grepl("Right|Left", Route))
 
-skills %>% 
-  group_by(GameID, EventID)
-  mutate(SideOfCenter2 = case_when(OnFieldPosition=="B" & grepl("Right", Route) ~ "R",
-                                   OnFieldPosition=="B" & grepl("Left", Route) ~ "L",
+skills2 <- skills %>% 
+  group_by(GameID, EventID) %>% 
+  mutate(SideOfCenterMod = case_when(grepl("Right", Route) & !grepl("Swing", Route) ~ "R",
+                                   grepl("Left", Route) & !grepl("Swing", Route) ~ "L",
                                    TRUE ~ SideOfCenter),
-         )
-  
+         RouteMod = str_remove_all(Route, " - Left| - Right|Chip - | |&|-"),
+         RouteMod = ifelse(RouteMod=="Go/Fly", "Go", RouteMod)) %>% 
+  inner_join(pbp %>% select(GameID, EventID, EventType, Hash)) %>% 
+  filter(grepl("pass", EventType)) %>% 
+  mutate(HashMod = case_when(Hash==1 ~ "L",
+                             Hash==2 ~ "M",
+                             Hash==3 ~ "R"))
 
-unique(skills$OnFieldPosition)
+unique(skills2$RouteMod)
 
 skills %>% 
   filter(OnFieldPosition == 'B') %>% 
   pull(Route) %>% 
   unique()
 
-skills %>% 
+skills2 %>% 
   group_by(GameID, EventID) %>% 
-  summarise(RightPlayers = sum(SideOfCenter=='R'),
-            LeftPlayers = sum(SideOfCenter=='L'),
-            BackfieldPlayers = sum(OnFieldPosition=='B')) %>% 
+  filter(OnFieldPosition!="QB") %>% 
+  summarise(RightPlayers = sum(SideOfCenterMod=='R'),
+            LeftPlayers = sum(SideOfCenterMod=='L'),
+            BackfieldPlayers = sum(SideOfCenterMod=="NULL")) %>% 
 ungroup() %>% 
   group_by(RightPlayers, LeftPlayers, BackfieldPlayers) %>% 
   summarise(count = n()) %>% 
@@ -43,13 +61,15 @@ skills %>% filter(FastMotion==1 & OnFieldPosition =='SWR')
 
 unique(skills$Route)
 
-formation_info <- skills %>% 
+formation_info <- skills2 %>% 
   group_by(GameID, EventID) %>% 
-  summarise(RightPlayers = sum(SideOfCenter=='R'),
-            LeftPlayers = sum(SideOfCenter=='L'),
-            BackfieldPlayers = sum(OnFieldPosition=='B')) %>% 
+  filter(OnFieldPosition!="QB") %>% 
+  summarise(RightPlayers = sum(SideOfCenterMod=='R'),
+            LeftPlayers = sum(SideOfCenterMod=='L'),
+            BackfieldPlayers = sum(SideOfCenterMod=="NULL"),
+            RightWR = sum(grepl("WR", OnFieldPosition) & SideOfCenterMod=="R"),
+            LeftWR = sum(grepl("WR", OnFieldPosition) & SideOfCenterMod=="L")) %>% 
   ungroup() %>% 
-  filter(RightPlayers + LeftPlayers + BackfieldPlayers == 5) %>% 
   mutate(Formation = case_when(RightPlayers==LeftPlayers ~ "2x2",
                                (RightPlayers==3 & LeftPlayers==1) | (RightPlayers==1 & LeftPlayers==3) ~ "3x1",
                                BackfieldPlayers==2 ~ "2-Backs",
@@ -78,35 +98,50 @@ skills %>%
   select(GameID, EventID, OnFieldPosition, SideOfCenter, Order_OutsideToInside, RouteMod)
   
 
-routeCombinations <- skills %>% 
+routeCombinations <- skills2 %>% 
   inner_join(formation_info, by=c("GameID", "EventID")) %>% 
   inner_join(passIDs) %>% 
   filter(OnFieldPosition!="QB") %>% 
   ungroup() %>% 
-  mutate(StrengthInd = case_when(SideOfCenter==Strength ~ "Strong",
-                                 SideOfCenter!=Strength & Strength!="Balanced" & OnFieldPosition!="B"~ "WeakA",
-                                 OnFieldPosition=="B" ~ "WeakBackfield",
-                                 Strength=="Balanced" & SideOfCenter=="R" ~ "Strong",
-                                 Strength=="Balanced" & SideOfCenter=="L" ~ "WeakA")) %>% 
-  group_by(GameID, EventID, OnFieldPosition) %>% 
+  mutate(StrengthInd = case_when(SideOfCenterMod==HashMod ~ "Boundary",
+                                 SideOfCenterMod!=HashMod & HashMod!="M" & SideOfCenterMod!="NULL"~ "Field",
+                                 OnFieldPosition=="B" & SideOfCenterMod=="NULL" ~ "RB",
+                                 HashMod=="M" & ((RightPlayers > LeftPlayers & SideOfCenterMod=="R") | (LeftPlayers > RightPlayers & SideOfCenterMod=="L"))  ~ "Field",
+                                 HashMod=="M" & ((RightPlayers > LeftPlayers & SideOfCenterMod=="L") | (LeftPlayers > RightPlayers & SideOfCenterMod=="R")) ~ "Boundary",
+                                 HashMod=="M" & RightPlayers==LeftPlayers & ((RightWR > LeftWR & SideOfCenterMod=="R") | (LeftWR > RightWR & SideOfCenterMod=="L")) ~ "Field",
+                                 HashMod=="M" & RightPlayers==LeftPlayers & ((RightWR > LeftWR & SideOfCenterMod=="L") | (LeftWR > RightWR & SideOfCenterMod=="R")) ~ "Boundary",
+                                 HashMod=="M" & RightPlayers==LeftPlayers & RightWR==LeftWR & SideOfCenterMod=="R" ~ "Field",
+                                 HashMod=="M" & RightPlayers==LeftPlayers & RightWR==LeftWR & SideOfCenterMod=="L" ~ "Boundary")) %>% 
+  group_by(GameID, EventID, StrengthInd) %>%
+  arrange(GameID, EventID, StrengthInd, Order_OutsideToInside) %>% 
   mutate(OrderID = ifelse(OnFieldPosition=="B", row_number(), Order_OutsideToInside),
          AlignOrder = paste0(StrengthInd, OrderID)) %>% 
-  select(OnFieldPosition, StrengthInd, OrderID, Formation, Strength, Route, IsBlocking, AlignOrder) %>% 
-  filter(Route!='NULL' & Route!="Blocking") %>% 
-  group_by(GameID, EventID, Formation, Strength) %>% 
-  arrange(GameID, EventID, StrengthInd, OrderID) %>% 
-  summarise(Routes = paste(Route, collapse=" // "),
-            RouteIDs = paste(AlignOrder, collapse = " // "))
+  select(OnFieldPosition, StrengthInd, OrderID, Formation, Strength, RouteMod, IsBlocking, AlignOrder, Hash) %>% 
+  filter(RouteMod!='NULL' & RouteMod!="Blocking") %>% 
+  group_by(GameID, EventID, Formation, Hash) %>% 
+  arrange(GameID, EventID, RouteMod) %>% 
+  summarise(Routes = paste(RouteMod, collapse=", "),
+            RouteIDs = paste(AlignOrder, collapse = ", "))
 
-routeCombinations
+routeCombinations 
+
+routeCombinations %>% 
+  ungroup() %>% 
+  unnest_tokens(bigram, Routes, token = "skip_ngrams", n=2, k=3) %>% 
+  arrange(GameID, EventID) %>% 
+  filter(grepl(" ", bigram)) %>% 
+  count(bigram, sort=T)
+
+
+
 
 unique(routeCombinations$Routes)
 
-view(skills %>% 
+skills %>% 
   filter(Route!="NULL" & Route!="Blocking") %>% 
   group_by(Route) %>% 
   summarise(count = n()) %>% 
-  arrange(-count))
+  arrange(-count)
 
 skills %>% 
   inner_join(formation_info, by=c("GameID", "EventID")) %>% 
@@ -224,4 +259,4 @@ skills %>%
             PlaysWithMoreThan1 = sum(ifelse(RouteCount > 1, 1, 0))/UniquePlays) %>% 
   arrange(-UniquePlays)
 
-
+unique(skills2$RouteMod)
