@@ -42,11 +42,6 @@ fib_data <- pbp %>%
   ungroup() %>% select(GameID, EventID, FIB)
 
 #identify unique route concepts
-
-getRoutes <- function(x) {
-  paste0(ifelse(Order_OutsideToInside == 1, Route, NA))
-}
-
 pbp %>%
   left_join(splayers) %>%
   select(GameID, EventID, OnFieldPosition, SideOfCenter, Order_OutsideToInside, Route) %>%
