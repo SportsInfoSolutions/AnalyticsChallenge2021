@@ -1,19 +1,25 @@
 library(tidyverse)
 library(RCurl)
+library(fastDummies)
 
 #load in the files
 
-pbp <- getURL("https://raw.githubusercontent.com/jackp01k/AnalyticsChallenge2021/main/Data/PlayByPlay.csv")
-pbp <- read.csv(text = pbp)
+pbp_raw <- getURL("https://raw.githubusercontent.com/jackp01k/AnalyticsChallenge2021/main/Data/PlayByPlay.csv")
+pbp_raw <- read.csv(text = pbp_raw)
 
-ginfo <- getURL("https://raw.githubusercontent.com/jackp01k/AnalyticsChallenge2021/main/Data/GameInfo.csv")
-ginfo <- read.csv(text = ginfo)
+ginfo_raw <- getURL("https://raw.githubusercontent.com/jackp01k/AnalyticsChallenge2021/main/Data/GameInfo.csv")
+ginfo_raw <- read.csv(text = ginfo_raw)
 
-tpoints <- getURL("https://raw.githubusercontent.com/jackp01k/AnalyticsChallenge2021/main/Data/PlayerTotalPoints.csv")
-tpoints <- read.csv(text = tpoints)
+tpoints_raw <- getURL("https://raw.githubusercontent.com/jackp01k/AnalyticsChallenge2021/main/Data/PlayerTotalPoints.csv")
+tpoints_raw <- read.csv(text = tpoints_raw)
 
-splayers <- getURL("https://raw.githubusercontent.com/jackp01k/AnalyticsChallenge2021/main/Data/SkillPositionPlayers.csv")
-splayers <- read.csv(text = splayers)
+splayers_raw <- getURL("https://raw.githubusercontent.com/jackp01k/AnalyticsChallenge2021/main/Data/SkillPositionPlayers.csv")
+splayers_raw <- read.csv(text = splayers_raw)
+
+pbp <- pbp_raw
+ginfo <- ginfo_raw
+tpoints <- tpoints_raw
+splayers <- splayers_raw
 
 names(splayers)
 
@@ -25,6 +31,15 @@ unique(pbp$Hash)
 unique(splayers$SideOfCenter)
 unique(splayers$Order_OutsideToInside)
 unique(splayers$Route)
+
+#clean data
+splayers <- splayers %>% dummy_cols(select_columns = "SideOfCenter") %>%
+  select(-SideOfCenter_NULL)
+
+alignments <- splayers %>% group_by(EventID, GameID) %>% summarise(left = sum(SideOfCenter_L),
+                                                           right = sum(SideOfCenter_R))
+
+pbp <- pbp %>% left_join(alignments, by = c("EventID", "GameID"))
 
 #identify FIB
 fib_data <- pbp %>%
