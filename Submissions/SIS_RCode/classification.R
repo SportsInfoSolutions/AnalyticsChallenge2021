@@ -1,11 +1,19 @@
 library(tidyverse)
+library(RCurl)
 
 #load in the files
 
-pbp <- read_csv(paste0(getwd(), "/Data/PlayByPlay.csv"))
-ginfo <- read_csv(paste0(getwd(), "/Data/GameInfo.csv"))
-tpoints <- read_csv(paste0(getwd(), "/Data/PlayerTotalPoints.csv"))
-splayers <- read_csv(paste0(getwd(), "/Data/SkillPositionPlayers.csv"))
+pbp <- getURL("https://raw.githubusercontent.com/jackp01k/AnalyticsChallenge2021/main/Data/PlayByPlay.csv")
+pbp <- read.csv(text = pbp)
+
+ginfo <- getURL("https://raw.githubusercontent.com/jackp01k/AnalyticsChallenge2021/main/Data/GameInfo.csv")
+ginfo <- read.csv(text = ginfo)
+
+tpoints <- getURL("https://raw.githubusercontent.com/jackp01k/AnalyticsChallenge2021/main/Data/PlayerTotalPoints.csv")
+tpoints <- read.csv(text = tpoints)
+
+splayers <- getURL("https://raw.githubusercontent.com/jackp01k/AnalyticsChallenge2021/main/Data/SkillPositionPlayers.csv")
+splayers <- read.csv(text = splayers)
 
 names(splayers)
 
