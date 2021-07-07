@@ -21,17 +21,11 @@ ginfo <- ginfo_raw
 tpoints <- tpoints_raw
 splayers <- splayers_raw
 
-names(splayers)
+#remove unused DF
+rm(pbp_raw, ginfo_raw, tpoints_raw, splayers_raw)
 
 #Create New Variables
 #FIB
-#RedZone
-
-unique(pbp$Hash)
-unique(splayers$SideOfCenter)
-unique(splayers$Order_OutsideToInside)
-unique(splayers$Route)
-
 #clean data
 splayers <- splayers %>% dummy_cols(select_columns = "SideOfCenter") %>%
   select(-SideOfCenter_NULL)
@@ -39,42 +33,10 @@ splayers <- splayers %>% dummy_cols(select_columns = "SideOfCenter") %>%
 alignments <- splayers %>% group_by(EventID, GameID) %>% summarise(left = sum(SideOfCenter_L),
                                                            right = sum(SideOfCenter_R))
 
+#create the FIB variable
 pbp <- pbp %>% left_join(alignments, by = c("EventID", "GameID")) %>% 
   mutate(FIB_R = if_else(right > left & Hash == 3, 1, 0),
          FIB_L = if_else(left > right & Hash == 1, 1, 0),
          FIB = if_else(FIB_L == 1 | FIB_R == 1, 1, 0))
-
-#identify FIB
-fib_data <- pbp %>%
-  #select relevant variables
-  select(GameID, EventID, Hash) %>%
-  #join with skill players
-  left_join(splayers %>% select(GameID, EventID, PlayerId, 
-                                OnFieldPosition, Order_OutsideToInside, 
-                                SideOfCenter)) %>%
-  #identify FIB L/R
-  mutate(iFIB = ifelse(SideOfCenter == "L" & Hash == 1 & Order_OutsideToInside == 3 & OnFieldPosition %in% c("SWR", "TE"), 1, 
-                      ifelse(SideOfCenter == "R" & Hash == 3 & Order_OutsideToInside == 3 & OnFieldPosition %in% c("SWR", "TE"), 1, 0))) %>%
-  group_by(EventID, GameID) %>%
-  mutate(FIB = max(iFIB)) %>%
-  ungroup() %>% select(GameID, EventID, FIB)
-
-#identify unique route concepts
-pbp %>%
-  left_join(splayers) %>%
-  select(GameID, EventID, OnFieldPosition, SideOfCenter, Order_OutsideToInside, Route) %>%
-  group_by(GameID, EventID) %>%
-  mutate(leftSide = ifelse(SideOfCenter == "L",
-                           paste0(
-                             ifelse(Order_OutsideToInside == 1, Route, NA),
-                             " :-: ",
-                             ifelse(Order_OutsideToInside == 2, Route, NA),
-                             " :-: ",
-                             ifelse(Order_OutsideToInside == 3, Route, NA),
-                             " :-: ",
-                             ifelse(Order_OutsideToInside == 4, Route, NA)
-                           ), NA)) %>% 
-  select(leftSide)
-  
 
 
