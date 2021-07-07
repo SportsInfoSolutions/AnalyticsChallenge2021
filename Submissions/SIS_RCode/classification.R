@@ -39,7 +39,10 @@ splayers <- splayers %>% dummy_cols(select_columns = "SideOfCenter") %>%
 alignments <- splayers %>% group_by(EventID, GameID) %>% summarise(left = sum(SideOfCenter_L),
                                                            right = sum(SideOfCenter_R))
 
-pbp <- pbp %>% left_join(alignments, by = c("EventID", "GameID"))
+pbp <- pbp %>% left_join(alignments, by = c("EventID", "GameID")) %>% 
+  mutate(FIB_R = if_else(right > left & Hash == 3, 1, 0),
+         FIB_L = if_else(left > right & Hash == 1, 1, 0),
+         FIB = if_else(FIB_L == 1 | FIB_R == 1, 1, 0))
 
 #identify FIB
 fib_data <- pbp %>%
@@ -74,7 +77,4 @@ pbp %>%
   select(leftSide)
   
 
-#RBS DONT MATTER
 
-
-# Aaron Rodgers is a system Quarterback
