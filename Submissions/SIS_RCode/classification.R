@@ -20,9 +20,6 @@ ginfo <- ginfo_raw
 tpoints <- tpoints_raw
 splayers <- splayers_raw
 
-#remove unused DF
-rm(pbp_raw, ginfo_raw, tpoints_raw, splayers_raw)
-
 #Create New Variables
 #FIB
 #clean data
