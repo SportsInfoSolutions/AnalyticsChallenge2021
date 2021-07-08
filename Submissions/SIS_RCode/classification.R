@@ -67,4 +67,59 @@ PFS_data <- pbp %>%
                            ifelse(right > left, "R","C"))) %>%
   select(GameID, EventID, PERS, FORM, STRENGTH)
 
+#create personnel detail data
+master_pers_frame <- splayers %>%
+  mutate(sideNum = paste0(SideOfCenter, Order_OutsideToInside)) %>%
+  spread(sideNum, RosterPosition)
+
+DETAIL_data <- master_pers_frame %>% 
+  select(GameID, EventID) %>% 
+  #subqueries for L1-4 (ordered outside to inside)
+  left_join(
+    master_pers_frame %>% 
+      filter(!is.na(L1)) %>%
+      select(GameID, EventID, L1)
+  ) %>%
+  left_join(
+    master_pers_frame %>% 
+      filter(!is.na(L2)) %>%
+      select(GameID, EventID, L2)
+  ) %>%
+  left_join(
+    master_pers_frame %>% 
+      filter(!is.na(L3)) %>%
+      select(GameID, EventID, L3)
+  ) %>%
+  left_join(
+    master_pers_frame %>% 
+      filter(!is.na(L4)) %>%
+      select(GameID, EventID, L4)
+  ) %>%
+  #subqueries for R1-4 (ordered outside to inside)
+  left_join(
+    master_pers_frame %>% 
+      filter(!is.na(R1)) %>%
+      select(GameID, EventID, R1)
+  ) %>%
+  left_join(
+    master_pers_frame %>% 
+      filter(!is.na(R2)) %>%
+      select(GameID, EventID, R2)
+  ) %>%
+  left_join(
+    master_pers_frame %>% 
+      filter(!is.na(R3)) %>%
+      select(GameID, EventID, R3)
+  ) %>%
+  left_join(
+    master_pers_frame %>% 
+      filter(!is.na(R4)) %>%
+      select(GameID, EventID, R4)
+  ) %>%
+  mutate(L_DETAIL = paste0(L1, "-", L2,  "-", L3, "-", L4),
+         R_DETAIL = paste0(R1, "-", R2,  "-", R3, "-", R4),
+         #A_DETAIL is from left to right across the entire field, 8 possible positions
+         A_DETAIL = paste0(L1, "-", L2,  "-", L3, "-", L4, "-", R4, "-", R3,  "-", R2, "-", R1)) %>%
+  select(GameID, EventID, L_DETAIL, R_DETAIL, A_DETAIL)
+
 
