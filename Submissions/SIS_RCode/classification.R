@@ -174,7 +174,10 @@ ROUTE_data <- master_route_data %>%
          Rr_DETAIL = paste0(R1, "::", R2,  "::", R3, "::", R4),
          #A_DETAIL is from left to right across the entire field, 8 possible positions
          Ar_DETAIL = paste0(L1, "::", L2,  "::", L3, "::", L4, "::", R4, "::", R3,  "::", R2, "::", R1)) %>%
-  select(GameID, EventID, Lr_DETAIL, Rr_DETAIL, Ar_DETAIL)
+  select(GameID, EventID, Lr_DETAIL, Rr_DETAIL, Ar_DETAIL) %>% 
+  group_by(GameID, EventID) %>% summarise(Left_Exact = first(Lr_DETAIL),
+                                          Rigt_Exact = first(Rr_DETAIL),
+                                          All_Exact = first(Ar_DETAIL))
 
 rm(master_route_data)
 
