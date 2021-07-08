@@ -15,10 +15,14 @@ tpoints_raw <- read.csv(text = tpoints_raw)
 splayers_raw <- getURL("https://raw.githubusercontent.com/jackp01k/AnalyticsChallenge2021/main/Data/SkillPositionPlayers.csv")
 splayers_raw <- read.csv(text = splayers_raw)
 
+join_raw <- getURL("https://github.com/jackp01k/AnalyticsChallenge2021/blob/main/Submissions/SIS_RCode/Local_Data/team_join.csv")
+join_raw <- read.csv(text = join_raw)
+
 pbp <- pbp_raw
 ginfo <- ginfo_raw
 tpoints <- tpoints_raw
 splayers <- splayers_raw
+joinfastR <- join_raw
 
 #Create New Variables
 #FIB
