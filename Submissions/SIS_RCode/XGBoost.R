@@ -1,6 +1,7 @@
 library(tidyverse)
 library(RCurl)
 library(fastDummies)
+library(xgboost)
 
 #load in the files
 pbp_raw <- getURL("https://raw.githubusercontent.com/jackp01k/AnalyticsChallenge2021/main/Data/PlayByPlay.csv")
@@ -83,7 +84,16 @@ pbp_route_data <- left_join(model_data, route_data, by=c("GameID", "EventID")) %
 pbp_route_data <- pbp_route_data %>% group_by(GameID, EventID) %>%
   summarise(across(Route_Angle:Route_Whip, sum))
 
-model_data <- model_data %>% left_join(pbp_route_data, by=c("GameID", "EventID"))
+model_data <- model_data %>% left_join(pbp_route_data, by=c("GameID", "EventID")) %>%
+  select(-GameID, -EventID)
 
+model_label <- as.matrix(model_data %>% select(EPA))
+model_data <- as.matrix(model_data %>% select(-EPA))
 
-  
+model_matrix <- xgb.DMatrix(data = model_data, label = model_label)
+
+model <- xgboost(data = model_matrix, nrounds = 2000)
+
+importance_matrix <- xgb.importance(model = model)
+print(importance_matrix)
+xgb.plot.importance(importance_matrix = importance_matrix)
