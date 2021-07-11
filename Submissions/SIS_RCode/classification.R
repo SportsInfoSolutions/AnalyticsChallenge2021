@@ -127,7 +127,7 @@ DETAIL_data <- master_pers_frame %>%
 
 rm(master_pers_frame)
 
-master_pers_frame <- splayers %>%
+master_route_data <- splayers %>%
   filter(!(str_detect(Route, "Screen"))) %>% 
   filter(!(Route == "NULL"), !(Route == "Jet Sweep Pass")) %>% 
   filter(!(Route == "Blocking")) %>% 
