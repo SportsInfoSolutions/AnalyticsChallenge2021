@@ -24,6 +24,8 @@ tpoints <- tpoints_raw
 splayers <- splayers_raw
 joinfastR <- join_raw
 
+rm(pbp_raw, ginfo_raw, tpoints_raw, splayers_raw, join_raw)
+
 #Create New Variables
 #FIB
 #clean data
@@ -125,9 +127,18 @@ DETAIL_data <- master_pers_frame %>%
 
 rm(master_pers_frame)
 
-master_route_data <- splayers %>%
+master_pers_frame <- splayers %>%
+  filter(!(str_detect(Route, "Screen"))) %>% 
+  filter(!(Route == "NULL"), !(Route == "Jet Sweep Pass")) %>% 
+  filter(!(Route == "Blocking")) %>% 
+  mutate(
+    #Remove right/left tags
+    Route = str_remove(Route, " - Left"),
+    Route = str_remove(Route, " - Right"),
+    #Remove chip tags on routes
+    Route = str_remove(Route, "Chip - ")
+  ) %>%
   mutate(sideNum = paste0(SideOfCenter, Order_OutsideToInside)) %>%
-  filter(!(Route == "NULL")) %>% 
   spread(sideNum, Route)
 
 ROUTE_data <- master_route_data %>% 
@@ -183,6 +194,5 @@ ROUTE_data <- master_route_data %>%
                                           Right_Exact = first(Rr_DETAIL),
                                           All_Exact = first(Ar_DETAIL))
 
-rm(master_route_data)
 
 
