@@ -1,0 +1,264 @@
+---
+title: "EPA Model"
+output: html_document
+---
+
+#Packages
+```{r}
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(janitor)
+library(gamm4)
+library(purrr)
+library(ggplot2)
+library(nflfastR)
+library(scales)
+library(brms)
+library(zoo)
+library(stats4)
+library(VGAM)
+library(gamlss)
+library(broom)
+library(ffscrapr)
+library(rethinking)
+```
+
+Similar to the completion percentage model, we can estimate the effect of a route combo on the EPA of a play while controlling for confounding factors. 
+
+#Data for modeling
+```{r}
+#load all route combos
+Data <- read_rds("Plays_For_Analysis.rds") %>%
+  ungroup()%>%
+  dplyr::select(-CoverageScheme.y) %>%
+  rename("CoverageScheme" = "CoverageScheme.x") %>%
+  #remove prevent, screen and other defense from our coverage 
+  filter(CoverageScheme != "Screen",
+         CoverageScheme != "Other",
+         CoverageScheme != "Prevent",
+         CoverageScheme != "NULL") %>%
+  #doing this for filtering purposes
+  filter(is.na(EPA_Final) == FALSE) %>%
+  mutate(Completion = as.integer(Completion),
+         Attempt = as.integer(Attempt),
+         ThrowDepth = as.integer(ThrowDepth),
+         combo = trimws(combo)) %>%
+  mutate(ID_Play = paste0(GameID,EventID),
+         Side_Targeted = ifelse(is.na(Side_Targeted) == TRUE, "C", Side_Targeted)) %>%
+  #filter for targets only
+  filter(Target == 1) %>%
+  filter(SideOfCenter == Side_Targeted)%>%
+  dplyr::select(combo,
+                CoverageScheme,
+                EPA_Final,
+                Attempt,
+                Completion,
+                ThrowDepth,
+                QB,
+                WR_Points,
+                QB_Points,
+                Down,
+                ToGo,
+                PressureOnPlay,
+                StartYard,
+                SideOfField) %>%
+  mutate(CoverageScheme = as.factor(CoverageScheme),
+         combo_coverage = paste0(combo, " | ", CoverageScheme),
+         Combo_Cov_ID = as.numeric(factor(str_c(combo_coverage))),
+         Coverage_ID = as.numeric(factor(str_c(CoverageScheme)))) %>%
+  #fix a few columns for the completion percentage model
+  dplyr::mutate(
+    ThrowDepth    = ifelse(ThrowDepth < 0, 0 , ThrowDepth),
+    ayard_is_zero = if_else(ThrowDepth == 0, 1, 0),
+    Difference    = 50 - StartYard,
+    StartYard     = ifelse(SideOfField == "Oppo", StartYard + (Difference*2), StartYard)) %>%
+  filter(QB != "Kendall Hinton",
+         QB != "Russell Gage",
+         QB != "Mecole Hardman") #just no
+```
+
+First, we need to adjust Quarterbacks who have a low number of attempts which is creating a non representative EPA for them. 
+
+```{r}
+#demonstrate our issue, Kyle Allen should not be estimated as among our best QB's
+Data %>%
+  group_by(QB) %>%
+  summarize(attempts = sum(Attempt),
+            epa = mean(EPA_Final)) %>%
+  arrange(desc(epa))
+
+#we can take the QB EPA per play throughout their career to get an estimate of their EPA per play
+pbp <- read_rds("NFL_Fast_R_CP.rds")
+
+passers <- Data %>%
+  mutate(QB = dp_cleannames(QB)) %>%
+  group_by(QB) %>%
+  summarize(attempts = sum(Attempt),
+            epa = mean(EPA_Final)) %>%
+  arrange(desc(epa))
+
+Full_Names <- nflfastR::fast_scraper_roster(2020) %>%
+  filter(position == "QB") %>%
+  dplyr::select(full_name,
+                gsis_id) %>%
+  arrange(full_name) %>%
+  mutate(full_name = ifelse(full_name == "C.J. Beathard", "CJ Beathard", full_name))
+
+#make our adjustment to EPA
+Passer_Adjustment <- pbp %>%
+  filter(is.na(passer_player_id) == FALSE, is.na(epa) == FALSE) %>%
+  group_by(passer_player_id) %>%
+  summarize(Career_EPA = mean(epa, na.rm = TRUE),
+         Career_Attempts = sum(pass_attempt, na.rm = TRUE)) %>%
+  ungroup() %>%
+  left_join(Full_Names, by = c("passer_player_id" = "gsis_id")) %>%
+  filter(is.na(full_name) == FALSE) %>%
+  left_join(passers, by = c("full_name" = "QB")) %>%
+  filter(is.na(attempts) == FALSE) %>%
+  mutate(Career_EPA = ifelse(Career_Attempts <= 10, -0.05929128, Career_EPA)) %>%
+  arrange(desc(Career_EPA)) %>%
+  dplyr::select(passer_player_id,
+                Career_EPA,
+                full_name) %>%
+  arrange(full_name)
+
+#add to SIS data
+Data <- Data %>%
+  mutate(QB = dp_cleannames(QB)) %>%
+  left_join(Passer_Adjustment, by = c("QB" = "full_name")) %>%
+  mutate(combo = as.factor(combo),
+         combo_ID = as.numeric(factor(str_c(combo)))) %>%
+  group_by(combo_coverage) %>%
+  mutate(Occurances = sum(Attempt)) %>%
+  filter(Occurances > 9) %>%
+  ungroup() 
+
+rm(pbp)
+```
+
+Now we can build the model of EPA and get our estimates. We will use a Bayesian mixed model so we can establish a prior on EPA which has an unusual distribution. A student T is appropriate here to capture outlier events.
+
+#Establish prior using student T and fit model.
+```{r}
+#Bayesian mixed model
+EPA_Mixed <- brms::brm(
+  EPA_Final ~ Career_EPA + (1 | combo_ID:Coverage_ID),
+  data  = Data)
+```
+
+Now we can extract our random effects and obtain our best route combos.
+
+#Get combo codes
+```{r}
+#get route combos for later merging
+combos <- Data %>%
+  group_by(combo_ID) %>%
+  dplyr::summarise(
+    combo = unique(combo),
+    occurances = n()
+  ) %>%
+  ungroup() %>%
+  rename("Combo_ID" = "combo_ID") %>%
+  mutate(Combo_ID = as.character(Combo_ID))
+
+#get coverages for later merging
+coverages <- Data %>%
+  group_by(Coverage_ID) %>%
+  dplyr::summarise(
+    CoverageScheme = unique(CoverageScheme)
+  ) %>%
+  ungroup() %>%
+  mutate(Coverage_ID = as.character(Coverage_ID))
+```
+
+#extract estimates
+```{r}
+est <- mixedup::extract_random_effects(EPA_Mixed) %>%
+  arrange(value) %>%
+  dplyr::rename("id" = "group") %>%
+  separate(id, c("Combo_ID", "Coverage_ID"), "_")
+
+# Prepare data for plot
+est <- est %>%
+  left_join(coverages, by = "Coverage_ID") %>%
+  left_join(combos , by = "Combo_ID") %>%
+  arrange(value) %>%
+  filter(is.na(CoverageScheme) == FALSE) %>%
+  filter(is.na(combo) == FALSE) %>%
+  dplyr::select(
+    -group_var,
+    -effect,
+    -Coverage_ID,
+    -Combo_ID
+  ) %>%
+  arrange(desc(value))
+```
+
+```{r}
+est  %>%
+  filter(CoverageScheme == "Cover 3") %>%
+  head(15) %>%
+  ggplot(aes(x = reorder(combo, value), value)) +
+  geom_linerange(size = .5, aes(
+    ymin = lower_2.5,
+    ymax = upper_97.5
+  ), color = "#838383") +
+    geom_point(colour = "#013369", size = 3) +
+  coord_flip() +
+  ylab("EPA") +
+    theme_bw() +
+  theme_light()+
+  theme(plot.title = element_text(color="black", size=8, face="bold"))+
+  theme(plot.title = element_text(size = 10, face = "bold"),
+  plot.subtitle = element_text(size = 8))+
+  theme(plot.background = element_rect(fill = "gray97"))+
+  theme(panel.background = element_rect(fill = "gray97"),
+        axis.title.y=element_blank(),
+        axis.ticks.y=element_blank())+
+  labs(title = "Individual Expected EPA Per Route Combo Against Cover 3: Top 15",
+       subtitle = "How each route combo increases CP after controlling for coverage type, and QB",
+       caption = "Plot: Joseph Chernak, Data: SIS") +
+  ggsave(filename = "Slide5_Bayes_EPA.png", 
+       dpi = 300, type = "cairo", width = 10, height = 7, units = "in")
+```
+
+
+We can also view how an individual combo performs against each coverage.
+
+```{r}
+est  %>%
+  filter(combo == "Go - Seam") %>%
+  ggplot(aes(x = reorder(CoverageScheme, value), value)) +
+  geom_linerange(size = .5, aes(
+    ymin = lower_2.5,
+    ymax = upper_97.5
+  ), color = "#838383") +
+    geom_point(colour = "#013369", size = 3) +
+  coord_flip() +
+  ylab("EPA") +
+    theme_bw() +
+  theme_light()+
+  theme(plot.title = element_text(color="black", size=8, face="bold"))+
+  theme(plot.title = element_text(size = 10, face = "bold"),
+  plot.subtitle = element_text(size = 8))+
+  theme(plot.background = element_rect(fill = "gray97"))+
+  theme(panel.background = element_rect(fill = "gray97"),
+        axis.title.y=element_blank(),
+        axis.ticks.y=element_blank())+
+  labs(title = "Individual Probability of Completion for the Go - Seam Combo Against Each Coverage",
+       subtitle = "How the Go - Seam combo increases EPA after controlling for coverage type and QB (minimum 10 attempts)",
+       caption = "Plot: Joseph Chernak, Data: SIS") +
+  ggsave(filename = "Slide5_Go_Seam.png", 
+       dpi = 300, type = "cairo", width = 10, height = 7, units = "in")
+```
+
+#save data
+```{r}
+write_rds(est, "EPA_Data.rds")
+```
+
+
+
+
+
