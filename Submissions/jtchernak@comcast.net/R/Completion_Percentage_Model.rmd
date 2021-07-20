@@ -1,0 +1,412 @@
+---
+title: "Analytics Challenge"
+output: html_document
+---
+
+First, load our packages for the model.
+
+#Packages
+```{r}
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(janitor)
+library(gamm4)
+library(purrr)
+library(ggplot2)
+library(nflfastR)
+library(scales)
+library(brms)
+library(zoo)
+library(stats4)
+library(VGAM)
+library(gamlss)
+library(broom)
+library(ffscrapr)
+library(rethinking)
+```
+
+Next, I load in the cleaned route combo data. I selected only variables of interest and output my data into the "Data" object.
+
+#Data for modeling
+```{r}
+#load all route combos
+Data <- read_rds("Plays_For_Analysis.rds") %>%
+  ungroup()%>%
+  dplyr::select(-CoverageScheme.y) %>%
+  rename("CoverageScheme" = "CoverageScheme.x") %>%
+  #remove prevent, screen and other defense from our coverage 
+  filter(CoverageScheme != "Screen",
+         CoverageScheme != "Other",
+         CoverageScheme != "Prevent",
+         CoverageScheme != "NULL") %>%
+  #doing this for filtering purposes
+  filter(is.na(EPA_Final) == FALSE) %>%
+  mutate(Completion = as.integer(Completion),
+         Attempt = as.integer(Attempt),
+         ThrowDepth = as.integer(ThrowDepth),
+         combo = trimws(combo)) %>%
+  mutate(ID_Play = paste0(GameID,EventID),
+         Side_Targeted = ifelse(is.na(Side_Targeted) == TRUE, "C", Side_Targeted)) %>%
+  #filter for targets only
+  filter(Target == 1) %>%
+  filter(SideOfCenter == Side_Targeted)%>%
+  dplyr::select(combo,
+                CoverageScheme,
+                EPA_Final,
+                Attempt,
+                Completion,
+                ThrowDepth,
+                QB,
+                WR_Points,
+                QB_Points,
+                Down,
+                ToGo,
+                PressureOnPlay,
+                StartYard,
+                SideOfField) %>%
+  mutate(CoverageScheme = as.factor(CoverageScheme),
+         combo_coverage = paste0(combo, " | ", CoverageScheme),
+         Combo_Cov_ID = as.numeric(factor(str_c(combo_coverage))),
+         Coverage_ID = as.numeric(factor(str_c(CoverageScheme)))) %>%
+  #fix a few columns for the completion percentage model
+  dplyr::mutate(
+    ThrowDepth    = ifelse(ThrowDepth < 0, 0 , ThrowDepth),
+    ayard_is_zero = if_else(ThrowDepth == 0, 1, 0),
+    Difference    = 50 - StartYard,
+    StartYard     = ifelse(SideOfField == "Oppo", StartYard + (Difference*2), StartYard)) %>%
+  filter(QB != "Kendall Hinton") #just no
+```
+
+Before we model each route combo, I want to know if controlling for the specific coverage type is a valuable activity. I fit a simple quadratic approximation to observe if each coverage has a different effect on the mean EPA.
+
+#What is the relationship between each coverage and EPA? Fit quadratic approximation model to determine if each coverage has a unique distribution
+```{r}
+#obtain a basic prior
+Data %>%
+  group_by(CoverageScheme) %>%
+  summarize(EPA_Mean = mean(EPA_Final),
+            EPA_SD   = sd(EPA_Final))
+
+#model via quap
+m1.1 <- quap(
+  alist(
+  EPA_Final  ~ dnorm(mu, sigma),
+  mu<- a[Coverage_ID],
+  a[Coverage_ID] ~ dnorm(.20, 1.37),
+  sigma             ~ dexp(1)
+), data = Data)
+
+post <- extract.samples(m1.1)  
+labels <- paste(levels(Data$CoverageScheme), sep="") 
+
+#So there are important differences to account for regarding coverage
+precis( m1.1, depth=2, pars="a") %>%
+  cbind(labels) %>%
+  arrange(mean) %>%
+  ggplot(aes(x = mean, y = reorder(labels, mean))) + 
+  geom_point() +
+  geom_linerange(size = .5, aes(
+    xmin = `5.5%`,
+    xmax = `94.5%`
+  )) +
+  theme_bw() +
+  labs(x = "Expected EPA", y = "Coverage", 
+       title = "Bayesian Quadratic Approximation of Relationship Between EPA & Coverage")+
+    theme_bw() +
+  theme_light()+
+  theme(plot.title = element_text(color="black", size=8, face="bold"))+
+  theme(plot.title = element_text(size = 10, face = "bold"),
+  plot.subtitle = element_text(size = 8))+
+  theme(plot.background = element_rect(fill = "gray97"))+
+  theme(panel.background = element_rect(fill = "gray97"))
+```
+
+So yes, there is reason to account for coverage type when modeling our route combos. But what about a who the QB is? That should influence our mixed model as well. I will pull in NFL FastR data and fit a Beta Binomial gam regression of completion percentage to get the "true" QB CP which can then be used for the model. The primary reason I am doing this is for players with small samples and Bayes can help adjust their CP. First, we load in our data.
+
+```{r}
+pbp <- read_rds("NFL_Fast_R_CP.rds")
+
+passers <- pbp %>%
+  group_by(passer_player_id) %>%
+  summarize(Name = unique(passer_player_name)) %>%
+  filter(is.na(passer_player_id) == FALSE, is.na(Name) == FALSE) %>%
+  ungroup()
+
+Full_Names <- nflfastR::fast_scraper_roster(2020) %>%
+  filter(position == "QB") %>%
+  dplyr::select(full_name,
+                gsis_id) %>%
+  arrange(full_name) %>%
+  mutate(full_name = ifelse(full_name == "C.J. Beathard", "CJ Beathard", full_name))
+```
+
+#fit QB model
+```{r}
+#quarterbacks who have more attempts generally have more because they are better aka they have a higher CP. So we will fit this into our model below.
+pbp <- pbp %>%
+  filter(pass_attempt == 1) %>%
+  group_by(passer_player_id) %>%
+  summarize(Attempts    = sum(pass_attempt),
+            Completions = sum(complete_pass),
+            CP          = Completions / Attempts) %>%
+  ungroup() 
+
+#plot
+pbp %>%
+  filter(Attempts > 20) %>%
+  ggplot(aes(x = Attempts, y = CP))+
+  geom_point() +
+  geom_smooth(method = lm, se = FALSE) +
+  geom_hline(yintercept = 0.5477644, linetype = "dashed")
+  
+#simple gam model
+fit <- gamlss::gamlss(cbind(Completions, Attempts - Completions) ~ log(Attempts),
+               data = pbp,
+               family = BB(mu.link = "identity"))
+
+#extract coefficients
+td <- tidy(fit)
+```
+
+#Now fit model to QB CP
+```{r}
+#grid of possible completion percentage values
+p_grid <- seq(from = 0, to = 1, length.out = 200)
+
+#extract prior from the CP distribution
+ll <- function(alpha, beta) {
+  x <- pbp$Completions
+  total <- pbp$Attempts
+  -sum(VGAM::dbetabinom.ab(x, total, alpha, beta, log = TRUE))
+}
+
+m <- mle(ll, start = list(alpha = 1, beta = 10), method = "L-BFGS-B", lower = c(0.0001, .1))
+ab <- coef(m)
+alpha0 <- ab[1]
+beta0 <- ab[2]
+
+#Add to our data to obtain estimates
+pbp_bayes <-  pbp %>%
+  mutate(eb_estimate = (Completions + alpha0) / (Attempts + alpha0 + beta0),
+         alpha1 = alpha0 + Completions,
+         beta1 = beta0 + Attempts - Completions,
+         low = qbeta(.025, alpha1, beta1),
+         high = qbeta(.975, alpha1, beta1)) %>%
+  left_join(passers, by = "passer_player_id") %>%
+  left_join(Full_Names, by = c("passer_player_id" = "gsis_id")) %>%
+  filter(is.na(full_name) == FALSE) %>%
+  dplyr::select(full_name,
+         eb_estimate,
+         passer_player_id,
+         CP,
+         Attempts) %>%
+  arrange(desc(full_name)) %>%
+  distinct()
+
+#observe how our bayes estimate worked
+pbp_bayes %>%
+  dplyr::select(-passer_player_id) %>%
+  rename("CP With EB Shrinkage" = "eb_estimate",
+         "CP Raw" = "CP") %>%
+  pivot_longer(cols = starts_with("CP"),
+   names_to = "Type",
+   values_to = "Completion_Percentage",
+   values_drop_na = TRUE
+ ) %>%
+  ggplot(aes(x = Attempts, y = `Completion_Percentage`))+
+  geom_point()+
+  facet_wrap(~Type) +
+  geom_hline(yintercept = 0.5477644, linetype = "dashed")+
+      scale_y_continuous(labels = scales::percent_format(accuracy = 1L), breaks=seq(0, 1, by = .10)) +
+  ylab("Completion Percentage") +
+    theme_bw() +
+  theme_light()+
+  theme(plot.title = element_text(color="black", size=8, face="bold"))+
+  theme(plot.title = element_text(size = 10, face = "bold"),
+  plot.subtitle = element_text(size = 8))+
+  theme(plot.background = element_rect(fill = "gray97"))+
+  theme(panel.background = element_rect(fill = "gray97"),
+        axis.title.y=element_blank(),
+        axis.ticks.y=element_blank())+
+  labs(title = "Empirical Bayes Shrinkage of Completion Percentage",
+       caption = "Plot: Joseph Chernak, Data: SIS") +
+  ggsave(filename = "Bayes_Shrinkage.png", 
+       dpi = 300, type = "cairo", width = 10, height = 7, units = "in")
+
+  
+
+```
+
+Now we can build a simple GAM model that accounts for situationally related factors (down, distance, etc.) along with who the QB is. The advantage of the Bayesian method above is that we don't have to throw out any data or set any QB with low attempts to an average completion percentage estimate. Below, I fit a gam mixed model on combos with greater than 9 attempts. 
+
+#Get data and filter for observations with greater than 9 attempts
+```{r}
+#data
+Data <- Data %>%
+  group_by(combo_coverage) %>%
+  mutate(Occurances = sum(Attempt)) %>%
+  filter(Occurances > 9) %>%
+  ungroup() %>%
+  mutate(combo = as.factor(combo),
+         combo_ID = as.numeric(factor(str_c(combo))),
+         QB = dp_cleannames(QB)) %>%
+  left_join(pbp_bayes, by = c("QB" = "full_name")) 
+
+#get route combos for later merging
+combos <- Data %>%
+  group_by(combo_ID) %>%
+  dplyr::summarise(
+    combo = unique(combo),
+    occurances = n()
+  ) %>%
+  ungroup() %>%
+  rename("Combo_ID" = "combo_ID") %>%
+  mutate(Combo_ID = as.character(Combo_ID))
+
+#get coverages for later merging
+coverages <- Data %>%
+  group_by(Coverage_ID) %>%
+  dplyr::summarise(
+    CoverageScheme = unique(CoverageScheme)
+  ) %>%
+  ungroup() %>%
+  mutate(Coverage_ID = as.character(Coverage_ID))
+```
+
+#Build the model
+```{r}
+gam_model <- gamm4(
+  Completion ~ #target
+    ToGo + #yards to go
+    StartYard + #yardline
+    Down + 
+    PressureOnPlay + #if there was pressure on the play
+    ayard_is_zero + #if the pass was at or behind line of scrimmage
+    eb_estimate + #estimate of QB true completion percentage
+    s(ThrowDepth), #spline on throw depth
+  random = ~ (1 | combo_ID:Coverage_ID), #crossed mixed effects
+  data = Data,
+  nAGQ = 0,
+  control = glmerControl(optimizer = "nloptwrap"),
+  family = binomial(link = "logit")
+)
+```
+
+Now we can extract our random effects and apply them to our data frame.
+
+#extract effects
+```{r}
+est <- broom.mixed::tidy(gam_model$mer, effects = "ran_vals") %>%
+  dplyr::rename("id" = "level") %>%
+  dplyr::filter(term == "(Intercept)") %>%
+  separate(id, c("Combo_ID", "Coverage_ID"), ":")
+
+# Function to convert logit to prob
+logit2prob <- function(logit) {
+  odds <- exp(logit)
+  prob <- odds / (1 + odds)
+  return(prob)
+}
+
+# Prepare data for plot
+Plot_Data <- est %>%
+  left_join(coverages, by = "Coverage_ID") %>%
+  left_join(combos , by = "Combo_ID") %>%
+  arrange(estimate) %>%
+  filter(is.na(CoverageScheme) == FALSE) %>%
+  filter(is.na(combo) == FALSE) %>%
+  dplyr::select(
+    -effect,
+    -group,
+    -Coverage_ID,
+    -Combo_ID,
+    -term
+  ) %>%
+  mutate(
+    lci = estimate - 1.96 * std.error,
+    uci = estimate + 1.96 * std.error,
+    prob = logit2prob(estimate),
+    prob_uci = logit2prob(uci),
+    prob_lci = logit2prob(lci)
+  ) %>%
+  arrange(desc(estimate))
+```
+
+Plotting our estimates for cover 3 shows us a high degree of uncertainty within each route combo. This is likely because each route combo is only run a small number of times relative to the total population. 
+
+```{r}
+Plot_Data  %>%
+  filter(CoverageScheme == "Cover 3") %>%
+  head(15) %>%
+  ggplot(aes(x = reorder(combo, prob), prob)) +
+  geom_linerange(size = .5, aes(
+    ymin = prob_lci,
+    ymax = prob_uci
+  ), color = "#838383") +
+    geom_point(colour = "#013369", size = 3) +
+  coord_flip() +
+  ylab("Completion Percentage") +
+    theme_bw() +
+  theme_light()+
+  theme(plot.title = element_text(color="black", size=8, face="bold"))+
+  theme(plot.title = element_text(size = 10, face = "bold"),
+  plot.subtitle = element_text(size = 8))+
+  theme(plot.background = element_rect(fill = "gray97"))+
+  theme(panel.background = element_rect(fill = "gray97"),
+        axis.title.y=element_blank(),
+        axis.ticks.y=element_blank())+
+  labs(title = "Individual Probability of Completion Per Route Combo Against Cover 3: Top 15",
+       subtitle = "How each route combo increases CP after controlling for coverage type, QB, and situation",
+       caption = "Plot: Joseph Chernak, Data: SIS") +
+    ylim(.4, .7) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1L), breaks=seq(0, 1, by = .02), limits = c(.4, .7))
+  ggsave(filename = "Slide5_C3.png", 
+       dpi = 300, type = "cairo", width = 10, height = 7, units = "in")
+```
+
+We can also view how an individual combo performs against each coverage.
+
+```{r}
+Plot_Data  %>%
+  filter(combo == "Curl - Flat") %>%
+  ggplot(aes(x = reorder(CoverageScheme, prob), prob)) +
+  geom_linerange(size = .5, aes(
+    ymin = prob_lci,
+    ymax = prob_uci
+  )) +
+    geom_point(colour = "#013369", size = 3) +
+  coord_flip() +
+  ylab("Completion Percentage") +
+    theme_bw() +
+  theme_light()+
+  theme(plot.title = element_text(color="black", size=8, face="bold"))+
+  theme(plot.title = element_text(size = 10, face = "bold"),
+  plot.subtitle = element_text(size = 8))+
+  theme(plot.background = element_rect(fill = "gray97"))+
+  theme(panel.background = element_rect(fill = "gray97"),
+        axis.title.y=element_blank(),
+        axis.ticks.y=element_blank())+
+  labs(title = "Individual Probability of Completion for the Curl - Flat Combo Against Each Coverage",
+       subtitle = "How the Curl - Flat combo increases CP after controlling for coverage type, QB, and situation",
+       caption = "Plot: Joseph Chernak, Data: SIS") +
+    ylim(.4, .7) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1L), breaks=seq(0, 1, by = .02), limits = c(.4, .64))+
+  ggsave(filename = "Slide5_CP.png", 
+       dpi = 300, type = "cairo", width = 10, height = 7, units = "in")
+```
+
+Save our data for later.
+
+```{r}
+Plot_Data %>%
+  mutate(Prob_Greater_Than_Average = prob - mean(Plot_Data$prob)) %>%
+  write_rds("Completion_Percentage_Data.rds")
+```
+
+
+
+
+
+
+
