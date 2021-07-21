@@ -240,14 +240,10 @@ pbp_bayes %>%
 
 Now we can build a simple GAM model that accounts for situationally related factors (down, distance, etc.) along with who the QB is. The advantage of the Bayesian method above is that we don't have to throw out any data or set any QB with low attempts to an average completion percentage estimate. Below, I fit a gam mixed model on combos with greater than 9 attempts. 
 
-#Get data and filter for observations with greater than 9 attempts
+#Get data and fit on all data, we will remove combos lower than 9 attempts later
 ```{r}
 #data
 Data <- Data %>%
-  group_by(combo_coverage) %>%
-  mutate(Occurances = sum(Attempt)) %>%
-  filter(Occurances > 9) %>%
-  ungroup() %>%
   mutate(combo = as.factor(combo),
          combo_ID = as.numeric(factor(str_c(combo))),
          QB = dp_cleannames(QB)) %>%
@@ -255,23 +251,18 @@ Data <- Data %>%
 
 #get route combos for later merging
 combos <- Data %>%
-  group_by(combo_ID) %>%
+  mutate(id = paste0(combo_ID, ":", Coverage_ID)) %>%
+  group_by(id) %>%
   dplyr::summarise(
     combo = unique(combo),
+    coverage = unique(CoverageScheme),
     occurances = n()
   ) %>%
   ungroup() %>%
-  rename("Combo_ID" = "combo_ID") %>%
-  mutate(Combo_ID = as.character(Combo_ID))
+  mutate(id = as.character(id)) %>%
+  arrange(desc(occurances))
 
-#get coverages for later merging
-coverages <- Data %>%
-  group_by(Coverage_ID) %>%
-  dplyr::summarise(
-    CoverageScheme = unique(CoverageScheme)
-  ) %>%
-  ungroup() %>%
-  mutate(Coverage_ID = as.character(Coverage_ID))
+
 ```
 
 #Build the model
@@ -299,8 +290,7 @@ Now we can extract our random effects and apply them to our data frame.
 ```{r}
 est <- broom.mixed::tidy(gam_model$mer, effects = "ran_vals") %>%
   dplyr::rename("id" = "level") %>%
-  dplyr::filter(term == "(Intercept)") %>%
-  separate(id, c("Combo_ID", "Coverage_ID"), ":")
+  dplyr::filter(term == "(Intercept)") 
 
 # Function to convert logit to prob
 logit2prob <- function(logit) {
@@ -311,16 +301,13 @@ logit2prob <- function(logit) {
 
 # Prepare data for plot
 Plot_Data <- est %>%
-  left_join(coverages, by = "Coverage_ID") %>%
-  left_join(combos , by = "Combo_ID") %>%
-  arrange(estimate) %>%
-  filter(is.na(CoverageScheme) == FALSE) %>%
+  left_join(combos , by = "id") %>%
+  filter(is.na(coverage) == FALSE) %>%
   filter(is.na(combo) == FALSE) %>%
   dplyr::select(
     -effect,
     -group,
-    -Coverage_ID,
-    -Combo_ID,
+    -id,
     -term
   ) %>%
   mutate(
@@ -330,14 +317,15 @@ Plot_Data <- est %>%
     prob_uci = logit2prob(uci),
     prob_lci = logit2prob(lci)
   ) %>%
-  arrange(desc(estimate))
+  arrange(desc(prob))
 ```
 
-Plotting our estimates for cover 3 shows us a high degree of uncertainty within each route combo. This is likely because each route combo is only run a small number of times relative to the total population. 
+Plotting our estimates for cover 3 shows us a high degree of uncertainty within each route combo. This is likely because each route combo is only run a small number of times relative to the total population. Also, filtering for minimum 9 attempts.
 
 ```{r}
 Plot_Data  %>%
-  filter(CoverageScheme == "Cover 3") %>%
+  filter(occurances > 9) %>%
+  filter(coverage == "Cover 3") %>%
   head(15) %>%
   ggplot(aes(x = reorder(combo, prob), prob)) +
   geom_linerange(size = .5, aes(
@@ -357,11 +345,11 @@ Plot_Data  %>%
         axis.title.y=element_blank(),
         axis.ticks.y=element_blank())+
   labs(title = "Individual Probability of Completion Per Route Combo Against Cover 3: Top 15",
-       subtitle = "How each route combo increases CP after controlling for coverage type, QB, and situation",
+       subtitle = "How each route combo increases CP after controlling for coverage type, QB, and situation | Min. 10 Attempts",
        caption = "Plot: Joseph Chernak, Data: SIS") +
     ylim(.4, .7) +
-    scale_y_continuous(labels = scales::percent_format(accuracy = 1L), breaks=seq(0, 1, by = .02), limits = c(.4, .7))
-  ggsave(filename = "Slide5_C3.png", 
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1L), breaks=seq(0, 1, by = .02), limits = c(.4, .66))+
+  ggsave(filename = "Slide5_C3_New.png", 
        dpi = 300, type = "cairo", width = 10, height = 7, units = "in")
 ```
 
@@ -370,7 +358,7 @@ We can also view how an individual combo performs against each coverage.
 ```{r}
 Plot_Data  %>%
   filter(combo == "Curl - Flat") %>%
-  ggplot(aes(x = reorder(CoverageScheme, prob), prob)) +
+  ggplot(aes(x = reorder(coverage, prob), prob)) +
   geom_linerange(size = .5, aes(
     ymin = prob_lci,
     ymax = prob_uci
@@ -392,7 +380,7 @@ Plot_Data  %>%
        caption = "Plot: Joseph Chernak, Data: SIS") +
     ylim(.4, .7) +
     scale_y_continuous(labels = scales::percent_format(accuracy = 1L), breaks=seq(0, 1, by = .02), limits = c(.4, .64))+
-  ggsave(filename = "Slide5_CP.png", 
+  ggsave(filename = "Slide5_CP_new.png", 
        dpi = 300, type = "cairo", width = 10, height = 7, units = "in")
 ```
 
@@ -400,7 +388,6 @@ Save our data for later.
 
 ```{r}
 Plot_Data %>%
-  mutate(Prob_Greater_Than_Average = prob - mean(Plot_Data$prob)) %>%
   write_rds("Completion_Percentage_Data.rds")
 ```
 
