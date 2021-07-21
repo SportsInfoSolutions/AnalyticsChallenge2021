@@ -477,6 +477,56 @@ route_chart2 <- route_combo_success_cov %>%
 
 gt::gtsave(route_chart2, file = file.path("C:/Users/Hoppy/OneDrive/NFL Analysis/Charts", "Route combo success rates vs cov.png"))
 
+# evaluate which route combos are best against each coverage type
+route_combo_success_cov2 <- routes_fin2 %>% 
+  group_by(route_combo_name, CoverageScheme) %>% 
+  summarize(plays = n(),
+            success_rate = mean(success),
+            xp_sr = mean(xp_success)) %>% 
+  ungroup() %>% 
+  mutate(sroe = success_rate - xp_sr) %>% 
+  filter(plays >= 5) %>% 
+  arrange(-sroe) %>% 
+  mutate(sroe_rank = row_number())
+
+best_route_combos <- route_combo_success_cov2 %>% 
+  group_by(CoverageScheme) %>% 
+  filter(sroe == max(sroe))
+
+route_chart3 <- best_route_combos %>% 
+  ungroup() %>%
+  gt() %>% 
+  tab_header(title = html("Top route combos against each coverage type"),
+             subtitle = "Minimum 5 plays used") %>% 
+  cols_label(route_combo_name = "Route Combo",
+             CoverageScheme = "Coverage Scheme",
+             plays = "Plays",
+             success_rate = "Success Rate",
+             sroe = "SROE") %>% 
+  cols_width(vars(route_combo_name) ~ px(225),
+             vars(CoverageScheme) ~ px(150),
+             vars(success_rate) ~ px(125),
+             vars(sroe) ~ px(125)) %>% 
+  cols_align(align = "center",
+             columns = vars(CoverageScheme, route_combo_name, plays, success_rate, sroe))%>% 
+  data_color(
+    columns = vars(success_rate, sroe),
+    colors = scales::col_numeric(
+      paletteer::paletteer_d(
+        palette = "RColorBrewer::RdBu"
+      ) %>% as.character(),
+      domain = NULL
+    )
+  ) %>% 
+  cols_hide(columns = vars(xp_sr, sroe_rank)) %>% 
+  fmt_percent(columns = vars(success_rate, sroe),
+              decimals = 1) %>% 
+  tab_source_note(
+    source_note = "Table: @SamHoppen | Data: Sports Info Solutions"
+  )
+
+gt::gtsave(route_chart3, file = file.path("C:/Users/Hoppy/OneDrive/NFL Analysis/Charts", "Best route combos vs cov.png"))
+
 
 # evaluate which specific targeted routes have the highest SROE
 route_success <- routes_fin2 %>% 
@@ -491,7 +541,7 @@ route_success <- routes_fin2 %>%
   arrange(-sroe)
 
 # create chart for individual route success rates when targeted
-route_chart3 <- route_success %>% 
+route_chart4 <- route_success %>% 
   gt() %>% 
   tab_header(title = html("Top targeted routes in<br>Success Rate Over Expected (SROE)")) %>% 
   cols_label(targeted_route = "Route",
@@ -516,7 +566,7 @@ route_chart3 <- route_success %>%
     source_note = "Table: @SamHoppen | Data: Sports Info Solutions"
   )
 
-gt::gtsave(route_chart3, file = file.path("C:/Users/Hoppy/OneDrive/NFL Analysis/Charts", "Individual route success rates.png"))
+gt::gtsave(route_chart4, file = file.path("C:/Users/Hoppy/OneDrive/NFL Analysis/Charts", "Individual route success rates.png"))
 
 # calculate route combos with highest success rate over expected by different coverages
 route_success_cov <- routes_fin2 %>% 
@@ -534,7 +584,7 @@ route_success_cov <- routes_fin2 %>%
   mutate(sroe_rank = row_number())
 
 # create chart for individual route success rates when targeted, including coverage schemes
-route_chart4 <- route_success_cov %>% 
+route_chart5 <- route_success_cov %>% 
   filter(sroe_rank <= 25) %>%
   gt() %>% 
   tab_header(title = html("Top 25 targeted routes in Success Rate Over<br>Expected (SROE) versus various coverage schemes"),
@@ -562,7 +612,7 @@ route_chart4 <- route_success_cov %>%
     source_note = "Table: @SamHoppen | Data: Sports Info Solutions"
   )
 
-gt::gtsave(route_chart4, file = file.path("C:/Users/Hoppy/OneDrive/NFL Analysis/Charts", "Individual route success rates vs cov.png"))
+gt::gtsave(route_chart5, file = file.path("C:/Users/Hoppy/OneDrive/NFL Analysis/Charts", "Individual route success rates vs cov.png"))
 
 
 # evaluate which player routes have the highest SR
