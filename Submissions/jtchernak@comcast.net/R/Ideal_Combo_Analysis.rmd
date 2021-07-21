@@ -1,0 +1,441 @@
+---
+title: "Ideal Combos"
+output: html_document
+---
+#Packages
+```{r}
+library(readr)
+library(dplyr)
+library(tidyverse)
+library(janitor)
+library(purrr)
+library(ggplot2)
+library(scales)
+library(reactable)
+library(tidyr)
+library(reactable)
+library(shiny)
+library(crosstalk)
+library(shinythemes)
+library(bslib)
+library(gt)
+library(rsconnect)
+```
+
+#Data
+```{r}
+Comp_Percentage_Data <- read_rds("Completion_Percentage_Data.rds") %>%
+  rename("CP_Estimate" = "prob") %>%
+  rename("Occurances" = "occurances")  %>%
+  dplyr::select(
+    -std.error,
+    -lci,
+    -uci,
+    -estimate
+  )
+
+EPA_Data             <- read_rds("EPA_Data.rds") %>%
+  rename("EPA_Estimate" = "value") %>%
+  dplyr::select(
+    -occurances,
+    -se
+  )
+  
+```
+
+#Merge data
+```{r}
+Data <- EPA_Data %>%
+  left_join(Comp_Percentage_Data, by = c("coverage", "combo")) %>%
+  arrange(desc(Occurances))
+
+rm(Comp_Percentage_Data)
+rm(EPA_Data)
+```
+
+#Plot combos estimated CP & EPA
+```{r}
+Data %>%
+  filter(Occurances > 9) %>%
+  ggplot(aes(x=CP_Estimate, y = EPA_Estimate))+
+  geom_point(shape = 21, colour = "black", fill = "#013369", size = 3, stroke = 1)+
+  ylab("EPA Estimate") +
+  xlab("Completion Percentage Estimate")+
+  theme_bw() +
+  theme_light()+
+  theme(plot.title = element_text(color="black", size=8, face="bold"))+
+  theme(plot.title = element_text(size = 10, face = "bold"),
+  plot.subtitle = element_text(size = 8))+
+  theme(plot.background = element_rect(fill = "gray97"))+
+  theme(panel.background = element_rect(fill = "gray97"))+
+  labs(title = "Most Plays With a High EPA Also Have a High Completion Percentage",
+       subtitle = "Route Combo EPA & CP For Each Route Combo (minimum 10 attempts)",
+       caption = "Plot: Joseph Chernak, Data: SIS") +
+  geom_hline(yintercept = 0, linetype = "dashed")+
+  geom_vline(xintercept = .50 , linetype = "dashed") +
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1L), breaks=seq(0, 1, by = .02))+
+  ylim(-0.05,0.06)+
+  annotate(geom="text", x=.54, y=-.04, label="High CP | Low EPA",
+              color="dark gray")+
+  annotate(geom="text", x=.54, y=.055, label="High CP | High EPA",
+              color="dark gray")+
+  annotate(geom="text", x=.47, y=.055, label="Low CP | High EPA",
+              color="dark gray")+
+  annotate(geom="text", x=.47, y=-.04, label="Low CP | Low EPA",
+              color="dark gray")+
+  ggsave(filename = "Slide6_All.png", 
+       dpi = 300, type = "cairo", width = 10, height = 7, units = "in")
+```
+
+So now we can determine what route combos are best against each coverage by capturing the points in the top right of the graph.
+
+#Data for table
+```{r}
+Table_Data <- Data %>%
+  dplyr::select(coverage,
+         combo,
+         CP_Estimate,
+         EPA_Estimate,
+         Occurances) %>%
+  arrange(desc(EPA_Estimate)) %>%
+  mutate(`Completion Percentage`  = ifelse(CP_Estimate  > .5, "+", "-"),
+         `EPA` = ifelse(EPA_Estimate > 0, "+", "-")) %>%
+  rename(`Route Combo` = "combo") %>%
+  rename(`Completion Percentage Estimate` = "CP_Estimate") %>%
+  rename(`EPA Estimate` = "EPA_Estimate") %>% 
+  rename(`Coverage Scheme` = "coverage") %>%
+  dplyr::select(`Route Combo`,
+         `Coverage Scheme`,
+         `EPA Estimate`,
+         `Completion Percentage Estimate`,
+         EPA,
+         `Completion Percentage`,
+         Occurances) %>%
+  mutate("Normalized Composite" = round(scale(`Completion Percentage Estimate`) + scale(`EPA Estimate`), digits = 3)) %>%
+  group_by(`Coverage Scheme`) %>%
+  mutate(Ranking = order(order(`Normalized Composite`, decreasing=TRUE))) %>%
+  ungroup() %>%
+  dplyr::select(-"Normalized Composite") %>%
+  relocate(Ranking)
+
+rm(Data)
+```
+
+#colors
+```{r}
+min_epa <- min(Table_Data$`EPA Estimate`)
+max_epa <- max(Table_Data$`EPA Estimate`)
+epa_palette <- col_numeric(c("#FEF0D9", "#990000"), domain = c(min_epa, max_epa), alpha = 0.75)
+
+min_cp <- min(Table_Data$`Completion Percentage Estimate`)
+max_cp <- max(Table_Data$`Completion Percentage Estimate`)
+cp_palette <- col_numeric(c("#FEF0D9", "#990000"), domain = c(min_cp, max_cp), alpha = 0.75)
+```
+
+#function to show top 5 route combos by coverage scheme
+```{r}
+
+Table_Creater <- function(Coverage, Min_Attempts) {
+
+C3_Table <- Table_Data %>%
+  filter(Occurances >= Min_Attempts, `Coverage Scheme` == Coverage) %>%
+  arrange(Ranking) %>%
+  head(5) %>%
+  gt() %>% 
+   #Hide unwanted columns
+   cols_hide(columns = vars(Ranking)) %>% 
+   #rename columns
+   cols_label(`EPA Estimate` = "EPA",
+              `Completion Percentage Estimate` = "Comp %",
+              `Completion Percentage` = "Comp %",
+              `EPA` = "EPA") %>% 
+    #change to percentage
+   fmt_percent(columns = vars(`Completion Percentage Estimate`)) %>%
+   #Add a table title
+   #Notice the `md` function allows us to write the title using markdown syntax (which allows HTML)
+   tab_header(title = paste0("Top 5 Route Combos Against ", Coverage , ": Minimum ", Min_Attempts, " Attempts")) %>% 
+   #Add a data source footnote
+   tab_source_note(source_note = "Table: Joseph Chernak, Data = SIS")
+
+
+return(C3_Table %>%
+  tab_style(
+     locations = cells_column_labels(columns = everything()),
+     style     = list(
+       #Give a thick border below
+       cell_borders(sides = "bottom", weight = px(3)),
+       #Make text bold
+       cell_text(weight = "bold")
+     )
+   ) %>% 
+   #Apply different style to the title
+   tab_style(
+     locations = cells_title(groups = "title"),
+     style     = list(
+       cell_text(weight = "bold", size = 16)
+     )
+   ) %>% 
+    data_color(columns = vars(`EPA Estimate`),
+               colors = epa_palette) %>%
+    data_color(columns = vars(`Completion Percentage Estimate`),
+               colors = cp_palette) %>%
+  #All column headers are capitalised
+   opt_all_caps() %>% 
+   #Use the Chivo font
+   #Note the great 'google_font' function in 'gt' that removes the need to pre-load fonts
+   opt_table_font(
+     font = list(
+       google_font("Chivo"),
+       default_fonts()
+     )
+   ) %>%
+   #Change the width of columns
+   cols_width(vars(`Route Combo`) ~ px(200),
+              vars(`Coverage Scheme`) ~ px(150),
+              vars(`EPA Estimate`) ~ px(75),
+              vars(`Completion Percentage Estimate`) ~ px(75),
+              vars(`EPA`) ~ px(75),
+              vars(`Completion Percentage`) ~ px(75)) %>% 
+   tab_options(
+     #Remove border between column headers and title
+     column_labels.border.top.width = px(3),
+     column_labels.border.top.color = "transparent",
+     #Remove border around table
+     table.border.top.color = "transparent",
+     table.border.bottom.color = "transparent",
+     #Reduce the height of rows
+     data_row.padding = px(3),
+     #Adjust font sizes and alignment
+     source_notes.font.size = 12,
+     heading.align = "center"
+   ) %>%
+  tab_spanner(
+    label = "Estimates",
+    columns = c("EPA Estimate", "Completion Percentage Estimate")
+  ) %>%
+  tab_spanner(
+    label = "Overall",
+    columns = c("EPA", "Completion Percentage")
+  ) %>%
+  cols_align(
+  align = c("center"),
+  columns = everything()
+) %>%
+  cols_align(
+  align = c("left"),
+  columns = "Route Combo"
+  )) }
+
+Table_Creater("Cover 3", 10) %>%
+  gtsave("Cover 3.png")
+```
+
+#Top 5 by coverage in one table
+```{r}
+Combination <- Table_Data %>%
+  filter(`Coverage Scheme` == "Combination") %>%
+  arrange(Ranking) %>%
+  filter(Occurances >= 1) %>%
+  head(5) 
+
+Cover_0 <- Table_Data %>%
+  filter(`Coverage Scheme` == "Cover 0") %>%
+  arrange(Ranking) %>%
+  filter(Occurances >= 5) %>%
+  head(5)
+
+Cover_1 <- Table_Data %>%
+  filter(`Coverage Scheme` == "Cover 1") %>%
+  arrange(Ranking) %>%
+  filter(Occurances >= 10) %>%
+  head(5)
+
+Cover_2 <- Table_Data %>%
+  filter(`Coverage Scheme` == "Cover 2") %>%
+  arrange(Ranking) %>%
+  filter(Occurances >= 10) %>%
+  head(5)
+
+Cover_3 <- Table_Data %>%
+  filter(`Coverage Scheme` == "Cover 3") %>%
+  arrange(Ranking) %>%
+  filter(Occurances >= 10) %>%
+  head(5) 
+
+Cover_4 <- Table_Data %>%
+  filter(`Coverage Scheme` == "Cover 4") %>%
+  arrange(Ranking) %>%
+  filter(Occurances >= 10) %>%
+  head(5) 
+
+Cover_6 <- Table_Data %>%
+  filter(`Coverage Scheme` == "Cover 6") %>%
+  arrange(Ranking) %>%
+  filter(Occurances >= 5) %>%
+  head(5) 
+
+Man_Cover_2 <- Table_Data %>%
+  filter(`Coverage Scheme` == "Man Cover 2") %>%
+  arrange(Ranking) %>%
+  filter(Occurances >= 5) %>%
+  head(5) 
+
+Tampa_2 <- Table_Data %>%
+  filter(`Coverage Scheme` == "Tampa 2") %>%
+  arrange(Ranking) %>%
+  filter(Occurances >= 1) %>%
+  head(5) 
+
+```
+
+
+```{r}
+Total_Data <- rbind(
+  Cover_0,
+  Cover_1,
+  Cover_2,
+  Cover_3,
+  Cover_4,
+  Cover_6,
+  Man_Cover_2,
+  Tampa_2,
+  Combination
+)
+```
+
+```{r}
+Total_Data %>% 
+  gt() %>%
+  tab_row_group(
+    label = "Cover 0 (Min 5 Attempts)",
+    rows = 1:5
+  ) %>%
+  tab_row_group(
+    label = "Cover 1 (Min 10 Attempts)",
+    rows = 6:10
+  ) %>%
+  tab_row_group(
+    label = "Cover 2 (Min 10 Attempts)",
+    rows = 11:15
+  ) %>%
+  tab_row_group(
+    label = "Cover 3 (Min 10 Attempts)",
+    rows = 16:20
+  ) %>%
+  tab_row_group(
+    label = "Cover 4 (Min 10 Attempts)",
+    rows = 21:25
+  ) %>%
+  tab_row_group(
+    label = "Cover 6 (Min 5 Attempts)",
+    rows = 26:30
+  ) %>%
+  tab_row_group(
+    label = "Man Cover 2 (Min 5 Attempts)",
+    rows = 31:35
+  ) %>%
+  tab_row_group(
+    label = "Tampa 2 (Min 1 Attempt)",
+    rows = 36:40
+  ) %>%
+  tab_row_group(
+    label = "Combination (Min 1 Attempt)",
+    rows = 41:45
+  ) %>%
+   #Hide unwanted columns
+   cols_hide(columns = vars(Ranking)) %>% 
+   #rename columns
+   cols_label(`EPA Estimate` = "EPA",
+              `Completion Percentage Estimate` = "Comp %",
+              `Completion Percentage` = "Comp %",
+              `EPA` = "EPA") %>% 
+    #change to percentage
+   fmt_percent(columns = vars(`Completion Percentage Estimate`)) %>%
+   #Add a table title
+   #Notice the `md` function allows us to write the title using markdown syntax (which allows HTML)
+   tab_header(title = paste0("Top 5 Route Combos Against Each Route Combo")) %>% 
+   #Add a data source footnote
+   tab_source_note(source_note = "Table: Joseph Chernak, Data = SIS") %>%
+  tab_style(
+     locations = cells_column_labels(columns = everything()),
+     style     = list(
+       #Give a thick border below
+       cell_borders(sides = "bottom", weight = px(3)),
+       #Make text bold
+       cell_text(weight = "bold")
+     )
+   ) %>% 
+   #Apply different style to the title
+   tab_style(
+     locations = cells_title(groups = "title"),
+     style     = list(
+       cell_text(weight = "bold", size = 16)
+     )
+   ) %>% 
+    data_color(columns = vars(`EPA Estimate`),
+               colors = epa_palette) %>%
+    data_color(columns = vars(`Completion Percentage Estimate`),
+               colors = cp_palette) %>%
+  #All column headers are capitalised
+   opt_all_caps() %>% 
+   #Use the Chivo font
+   #Note the great 'google_font' function in 'gt' that removes the need to pre-load fonts
+   opt_table_font(
+     font = list(
+       google_font("Chivo"),
+       default_fonts()
+     )
+   ) %>%
+   #Change the width of columns
+   cols_width(vars(`Route Combo`) ~ px(200),
+              vars(`Coverage Scheme`) ~ px(150),
+              vars(`EPA Estimate`) ~ px(75),
+              vars(`Completion Percentage Estimate`) ~ px(75),
+              vars(`EPA`) ~ px(75),
+              vars(`Completion Percentage`) ~ px(75)) %>% 
+   tab_options(
+     #Remove border between column headers and title
+     column_labels.border.top.width = px(3),
+     column_labels.border.top.color = "transparent",
+     #Remove border around table
+     table.border.top.color = "transparent",
+     table.border.bottom.color = "transparent",
+     #Reduce the height of rows
+     data_row.padding = px(3),
+     #Adjust font sizes and alignment
+     source_notes.font.size = 12,
+     heading.align = "center"
+   ) %>%
+  tab_spanner(
+    label = "Estimates",
+    columns = c("EPA Estimate", "Completion Percentage Estimate")
+  ) %>%
+  tab_spanner(
+    label = "Overall",
+    columns = c("EPA", "Completion Percentage")
+  ) %>%
+  cols_align(
+  align = c("center"),
+  columns = everything()
+) %>%
+  cols_align(
+  align = c("left"),
+  columns = "Route Combo"
+  ) %>%
+  gtsave("Finaltable.png")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
