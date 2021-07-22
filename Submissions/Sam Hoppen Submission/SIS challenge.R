@@ -20,14 +20,6 @@ source('https://raw.githubusercontent.com/samhoppen/Fantasy-Evaluator/main/Code/
 pbp <- read_csv(url("https://raw.githubusercontent.com/samhoppen/AnalyticsChallenge2021/main/Data/PlayByPlay.csv"))
 player_positions <- read_csv(url("https://raw.githubusercontent.com/samhoppen/AnalyticsChallenge2021/main/Data/SkillPositionPlayers.csv"))
 
-# load colors for player routes chart
-teams_colors_logos <- nflfastR::teams_colors_logos %>% 
-  filter(team_abbr != "OAK",
-         team_abbr != "STL",
-         team_abbr != "SD",
-         team_abbr != "LA")
-
-
 #### CREATE NEW ROUTES ####
 # convert routes into new route tree definition of route
 new_routes <- player_positions %>% 
@@ -348,7 +340,6 @@ routes_fin2 <- cbind(routes_fin2,
                      event_ids)
 
 #### EVALUATION ####
-
 routes_fin2 <- read_csv(url("https://raw.githubusercontent.com/samhoppen/AnalyticsChallenge2021/main/Data/SIS%20Routes%20Data.csv"))
 new_routes <- read_csv(url("https://raw.githubusercontent.com/samhoppen/AnalyticsChallenge2021/main/Data/SIS%20Player%20Routes.csv"))
 
@@ -358,11 +349,6 @@ targeted_routes <- new_routes %>%
   dplyr::select(GameID, EventID, Name, route_tree) %>% 
   rename(targeted_route = route_tree,
          targeted_player = Name)
-
-# pull only team names
-teams <- pbp %>% 
-  dplyr::select(GameID, EventID, OffensiveTeam) %>% 
-  distinct()
 
 # create list of route combination names
 route_combo_names <- new_routes  %>% 
@@ -381,7 +367,7 @@ route_combo_names <- new_routes  %>%
 # join newly-created dataframes with existing data frame
 routes_fin2 <- routes_fin2 %>% 
   left_join(targeted_routes) %>% 
-  left_join(teams) %>% 
+  #left_join(teams) %>% 
   left_join(route_combo_names)
 
 # calculate route combos with highest success rate over expected
@@ -415,7 +401,7 @@ route_chart1 <- route_combo_success %>%
     columns = vars(success_rate, sroe),
     colors = scales::col_numeric(
       paletteer::paletteer_d(
-        palette = "RColorBrewer::RdBu"
+        palette = "RColorBrewer::Blues"
       ) %>% as.character(),
       domain = NULL
     )
@@ -463,7 +449,7 @@ route_chart2 <- route_combo_success_cov %>%
     columns = vars(success_rate, sroe),
     colors = scales::col_numeric(
       paletteer::paletteer_d(
-        palette = "RColorBrewer::RdBu"
+        palette = "RColorBrewer::Blues"
       ) %>% as.character(),
       domain = NULL
     )
@@ -513,7 +499,7 @@ route_chart3 <- best_route_combos %>%
     columns = vars(success_rate, sroe),
     colors = scales::col_numeric(
       paletteer::paletteer_d(
-        palette = "RColorBrewer::RdBu"
+        palette = "RColorBrewer::Blues"
       ) %>% as.character(),
       domain = NULL
     )
@@ -554,7 +540,7 @@ route_chart4 <- route_success %>%
     columns = vars(success_rate, sroe),
     colors = scales::col_numeric(
       paletteer::paletteer_d(
-        palette = "RColorBrewer::RdBu"
+        palette = "RColorBrewer::Blues"
       ) %>% as.character(),
       domain = NULL
     )
@@ -600,7 +586,7 @@ route_chart5 <- route_success_cov %>%
     columns = vars(success_rate, sroe),
     colors = scales::col_numeric(
       paletteer::paletteer_d(
-        palette = "RColorBrewer::RdBu"
+        palette = "RColorBrewer::Blues"
       ) %>% as.character(),
       domain = NULL
     )
@@ -618,39 +604,39 @@ gt::gtsave(route_chart5, file = file.path("C:/Users/Hoppy/OneDrive/NFL Analysis/
 # evaluate which player routes have the highest SR
 player_route_success <- routes_fin2 %>% 
   group_by(targeted_player,
-           targeted_route,
-           OffensiveTeam) %>% 
+           targeted_route) %>% 
   summarize(targets = n(),
             success_rate = mean(success),
             xp_sr = mean(xp_success)) %>% 
   ungroup() %>% 
-  mutate(sroe = success_rate - xp_sr,
-         player_label = paste0(targeted_player, " (",targeted_route,")")) %>% 
+  mutate(sroe = success_rate - xp_sr) %>%
   filter(targets >= 20,
          success_rate >= 0.5,
          !is.na(targeted_player)) %>% 
-  arrange(-sroe) %>% 
-  left_join(teams_colors_logos,
-            by = c("OffensiveTeam" = "team_nick"))
+  arrange(-sroe)
 
 # create plot of players' routes success rates
 wr_chart <- ggplot(data = player_route_success) +
-  geom_point(aes(x = success_rate, y = xp_sr, size = targets, color = I(team_color)), alpha = 0.6) + 
+  geom_point(aes(x = success_rate, y = xp_sr, size = targets, color = targeted_route)) + 
   geom_vline(xintercept = median(player_route_success$success_rate), linetype = "dashed") +
   geom_hline(yintercept = median(player_route_success$xp_sr), linetype = "dashed") +
-  geom_text_repel(aes(x = success_rate, y = xp_sr, label = player_label), size = 4.5) + 
-  scale_size_continuous(range = c(0, 10)) +#, breaks =  c(0, 0.1, 0.2, 0.3, 0.4, 0.5), labels = c("0%","10%", "20%", "30%", "40%", "50%")) +
+  geom_text_repel(aes(x = success_rate, y = xp_sr, label = targeted_player), size = 4.5) + 
+  scale_size_continuous(range = c(5, 15)) +#, breaks =  c(0, 0.1, 0.2, 0.3, 0.4, 0.5), labels = c("0%","10%", "20%", "30%", "40%", "50%")) +
+  scale_color_brewer(palette = "Paired") +
   scale_y_continuous(labels = scales::percent_format(accuracy=1),
                      limits = c(0.45, 0.85)) +
   scale_x_continuous(labels = scales::percent_format(accuracy=1),
                      limits = c(0.45, 0.85)) +
   theme_FE +
-  labs(title = "Comparing wide receivers' success rate to expected success rate based on route type",
-       subtitle = "Minimum 20 targets and 50% success rate for a route in 2020 | Size of bubble represents number of targets",
+  labs(title = "Comparing players' success rate to expected success rate based on route type",
+       subtitle = "Minimum 20 targets and 50% success rate for a route in 2020",
        caption = "Figure: @SamHoppen | Data: Sports Info Solutions",
        x = "Success Rate",
-       y = "Expected Success Rate")  +
-  theme(legend.position = "none")
+       y = "Expected Success Rate",
+       size = "Targets",
+       color = "Route")  +
+  theme(legend.position = "right") +
+  guides(color = guide_legend(override.aes = list(size = 10)))
 
 brand_nfl_plot(wr_chart,
                asp = 16/9,
