@@ -1,0 +1,1168 @@
+---
+title: "SIS Analytics"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+**PROBLEM- Which route combinations were most popular in the NFL in 2020? Of these route combinations, which perform best against each coverage type?**
+
+
+
+
+```{r}
+Game_Info<- read.csv("~/Desktop/Football/AnalyticsChallenge2021-main/Data/GameInfo.csv")
+PBP <- read.csv("~/Desktop/Football/AnalyticsChallenge2021-main/Data/PlayByPlay.csv")
+Player_Tot_Points<- read.csv("~/Desktop/Football/AnalyticsChallenge2021-main/Data/PlayerTotalPoints.csv")
+Skill_Pos_Players<- read.csv("~/Desktop/Football/AnalyticsChallenge2021-main/Data/SkillPositionPlayers.csv")
+```
+
+
+```{r}
+
+Pbp_Routes<- data.frame("GameID" = Skill_Pos_Players$GameID, "EventID" = Skill_Pos_Players$EventID, "Name"= Skill_Pos_Players$Name, "RosterPosition" = Skill_Pos_Players$RosterPosition, "Order_OutsideToInside" = Skill_Pos_Players$Order_OutsideToInside, "Side"= Skill_Pos_Players$SideOfCenter, "Route" = Skill_Pos_Players$Route, "FastMotion" = Skill_Pos_Players$FastMotion, "Target" = Skill_Pos_Players$Target, "Reception" = Skill_Pos_Players$Reception)
+
+Pbp_Routes<- Pbp_Routes[Pbp_Routes$RosterPosition != "QB", ]
+  
+```
+
+```{r}
+#L1
+
+Pbp_Routes$L1_Pos <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 1) &
+        (Pbp_Routes$Side == "L")),                                     
+    Pbp_Routes$RosterPosition,  # if condition is met, put RosterPos
+    " " # else put NaN
+)
+Pbp_Routes$L1_Route <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 1) &
+        (Pbp_Routes$Side == "L")),                                     
+    Pbp_Routes$Route,  # if condition is met, put Route
+    " "  # else put Nan
+)
+Pbp_Routes$L1_FastMo <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 1) &
+        (Pbp_Routes$Side == "L") &
+        (Pbp_Routes$FastMotion == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+Pbp_Routes$L1_Target <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 1) &
+        (Pbp_Routes$Side == "L") &
+        (Pbp_Routes$Target == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+
+Pbp_Routes$L1_Reception <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 1) &
+        (Pbp_Routes$Side == "L") &
+        (Pbp_Routes$Reception == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+
+#L2
+
+Pbp_Routes$L2_Pos <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 2) &
+        (Pbp_Routes$Side == "L")),                                     
+    Pbp_Routes$RosterPosition,  # if condition is met, put RosterPos
+    " " # else put NaN
+)
+Pbp_Routes$L2_Route <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 2) &
+        (Pbp_Routes$Side == "L")),                                     
+    Pbp_Routes$Route,  # if condition is met, put Route
+    " "  # else put Nan
+)
+Pbp_Routes$L2_FastMo <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 2) &
+        (Pbp_Routes$Side == "L") &
+        (Pbp_Routes$FastMotion == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+Pbp_Routes$L2_Target <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 2) &
+        (Pbp_Routes$Side == "L") &
+        (Pbp_Routes$Target == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+
+Pbp_Routes$L2_Reception <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 2) &
+        (Pbp_Routes$Side == "L") &
+        (Pbp_Routes$Reception == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+#L3
+
+Pbp_Routes$L3_Pos <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 3) &
+        (Pbp_Routes$Side == "L")),                                     
+    Pbp_Routes$RosterPosition,  # if condition is met, put RosterPos
+    " " # else put NaN
+)
+Pbp_Routes$L3_Route <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 3) &
+        (Pbp_Routes$Side == "L")),                                     
+    Pbp_Routes$Route,  # if condition is met, put Route
+    " "  # else put Nan
+)
+Pbp_Routes$L3_FastMo <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 3) &
+        (Pbp_Routes$Side == "L") &
+        (Pbp_Routes$FastMotion == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+Pbp_Routes$L3_Target <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 3) &
+        (Pbp_Routes$Side == "L") &
+        (Pbp_Routes$Target == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+
+Pbp_Routes$L3_Reception <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 3) &
+        (Pbp_Routes$Side == "L") &
+        (Pbp_Routes$Reception == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+
+
+#L4
+
+Pbp_Routes$L4_Pos <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 4) &
+        (Pbp_Routes$Side == "L")),                                     
+    Pbp_Routes$RosterPosition,  # if condition is met, put RosterPos
+    " " # else put NaN
+)
+Pbp_Routes$L4_Route <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 4) &
+        (Pbp_Routes$Side == "L")),                                     
+    Pbp_Routes$Route,  # if condition is met, put Route
+    " "  # else put Nan
+)
+Pbp_Routes$L4_FastMo <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 4) &
+        (Pbp_Routes$Side == "L") &
+        (Pbp_Routes$FastMotion == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+Pbp_Routes$L4_Target <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 4) &
+        (Pbp_Routes$Side == "L") &
+        (Pbp_Routes$Target == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+
+Pbp_Routes$L4_Reception <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 4) &
+        (Pbp_Routes$Side == "L") &
+        (Pbp_Routes$Reception == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+
+
+#R1
+
+Pbp_Routes$R1_Pos <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 1) &
+        (Pbp_Routes$Side == "R")),                                     
+    Pbp_Routes$RosterPosition,  # if condition is met, put RosterPos
+    
+    " " # else put NaN
+)
+Pbp_Routes$R1_Route <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 1) &
+        (Pbp_Routes$Side == "R")),                                     
+    Pbp_Routes$Route,  # if condition is met, put Route
+    " "  # else put Nan
+)
+Pbp_Routes$R1_FastMo <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 1) &
+        (Pbp_Routes$Side == "R") &
+        (Pbp_Routes$FastMotion == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+Pbp_Routes$R1_Target <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 1) &
+        (Pbp_Routes$Side == "R") &
+        (Pbp_Routes$Target == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+
+Pbp_Routes$R1_Reception <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 1) &
+        (Pbp_Routes$Side == "R") &
+        (Pbp_Routes$Reception == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+
+#R2
+
+Pbp_Routes$R2_Pos <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 2) &
+        (Pbp_Routes$Side == "R")),                                     
+    Pbp_Routes$RosterPosition,  # if condition is met, put RosterPos
+    " " # else put NaN
+)
+Pbp_Routes$R2_Route <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 2) &
+        (Pbp_Routes$Side == "R")),                                     
+    Pbp_Routes$Route,  # if condition is met, put Route
+    " "  # else put Nan
+)
+Pbp_Routes$R2_FastMo <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 2) &
+        (Pbp_Routes$Side == "R") &
+        (Pbp_Routes$FastMotion == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+Pbp_Routes$R2_Target <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 2) &
+        (Pbp_Routes$Side == "R") &
+        (Pbp_Routes$Target == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+
+Pbp_Routes$R2_Reception <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 2) &
+        (Pbp_Routes$Side == "R") &
+        (Pbp_Routes$Reception == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+#R3
+
+Pbp_Routes$R3_Pos <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 3) &
+        (Pbp_Routes$Side == "R")),                                     
+    Pbp_Routes$RosterPosition,  # if condition is met, put RosterPos
+    " " # else put NaN
+)
+Pbp_Routes$R3_Route <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 3) &
+        (Pbp_Routes$Side == "R")),                                     
+    Pbp_Routes$Route,  # if condition is met, put Route
+    " "  # else put Nan
+)
+Pbp_Routes$R3_FastMo <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 3) &
+        (Pbp_Routes$Side == "R") &
+        (Pbp_Routes$FastMotion == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+Pbp_Routes$R3_Target <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 3) &
+        (Pbp_Routes$Side == "R") &
+        (Pbp_Routes$Target == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+
+Pbp_Routes$R3_Reception <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 3) &
+        (Pbp_Routes$Side == "R") &
+        (Pbp_Routes$Reception == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+
+#R4
+
+
+Pbp_Routes$R4_Pos <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 4) &
+        (Pbp_Routes$Side == "R")),                                     
+    Pbp_Routes$RosterPosition,  # if condition is met, put RosterPos
+    " " # else put NaN
+)
+Pbp_Routes$R4_Route <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 4) &
+        (Pbp_Routes$Side == "R")),                                     
+    Pbp_Routes$Route,  # if condition is met, put Route
+    " "  # else put Nan
+)
+Pbp_Routes$R4_FastMo <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 4) &
+        (Pbp_Routes$Side == "R") &
+        (Pbp_Routes$FastMotion == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+Pbp_Routes$R4_Target <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 4) &
+        (Pbp_Routes$Side == "R") &
+        (Pbp_Routes$Target == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+
+Pbp_Routes$R4_Reception <- ifelse(
+    ( 
+        (Pbp_Routes$Order_OutsideToInside == 4) &
+        (Pbp_Routes$Side == "R") &
+        (Pbp_Routes$Reception == 1)),                                     
+    1,  # if condition is met, put 1
+    " "  # else put 0
+)
+
+
+
+```
+c("Go/Fly" = "Vert","Check & Release" = "Other","Swing - Left" = "Swing","Swing - Right" = "Swing","Sluggo" = "Dbl Move","Chip - Flat" = "Flat", "Flat - Left" = "Flat", "Flat - Right" = "Flat", "Seam" = "Vert", "Deep Cross" = "Cross", "Screen - RB" = "Screen", "Screen - Bubble" = "Screen", "Run Fake" = "Other", "Screen - TE" = "Screen", "Beneath" = "Drag", "Screen - Quick" = "Screen", "Chip - Drag" = "Drag", "Whip" = "Out", "Screen - Tunnel" = "Screen", "Chip - Curl" = "Curl", "Over Ball" =  "Snag", "Pick" = "Other", "Hitch & Go" = "Dbl Move", "Quick" = "Screen", "Angle" = "In", "Dig" = "In", "Post Corner" = "Dbl Move", "Stick - Nod" = "Dbl Move", "Chip - Seam", "Vert", "Out & Up"= "Dbl Move", "Corner Post", "Dbl Move", "Chip" = "Other", "Screen - Shovel", "Screen", "Jerk" = "In", "Leak" = "Vert", "Screen - Beneath" = "Screen", "Screen - Drag" = "Screen")
+```{r}
+
+#Pbp_Routes<- read.csv("~/Desktop/Football/AnalyticsChallenge2021-main/Data/Updated Routes.csv")
+```
+
+
+
+```{r}
+Route_Data<- Pbp_Routes %>%
+  select(GameID, EventID, L1_Pos, L1_Route, L1_FastMo, L1_Target, L1_Reception, L2_Pos, L2_Route, L2_FastMo, L2_Target, L2_Reception, L3_Pos, L3_Route, L3_FastMo, L3_Target, L3_Reception, L4_Pos, L4_Route, L4_FastMo, L4_Target, L4_Reception, R1_Pos, R1_Route, R1_FastMo, R1_Target, R1_Reception, R2_Pos, R2_Route, R2_FastMo, R2_Target, R2_Reception, R3_Pos, R3_Route, R3_FastMo, R3_Target, R3_Reception, R4_Pos, R4_Route, R4_FastMo, R4_Target, R4_Reception)
+
+
+Route_Data<- Route_Data %>% 
+  mutate(across(where(is.character), str_remove_all, pattern = fixed(" ")))
+```
+
+
+```{r}
+Route_Data<- Route_Data %>%
+  group_by(GameID, EventID) %>%
+  summarise(L1_Pos= toString(L1_Pos), L1_Route = toString(L1_Route), L1_FastMo= toString(L1_FastMo), L1_Target= toString(L1_Target), L1_Reception= toString(L1_Reception), L2_Pos= toString(L2_Pos), L2_Route = toString(L2_Route), L2_FastMo= toString(L2_FastMo), L2_Target= toString(L2_Target), L2_Reception= toString(L2_Reception), L3_Pos= toString(L3_Pos), L3_Route = toString(L3_Route), L3_FastMo= toString(L3_FastMo), L3_Target= toString(L3_Target), L3_Reception= toString(L3_Reception), L4_Pos= toString(L4_Pos), L4_Route = toString(L4_Route), L4_FastMo= toString(L4_FastMo), L4_Target= toString(L4_Target), L4_Reception= toString(L4_Reception), R1_Pos= toString(R1_Pos), R1_Route = toString(R1_Route), R1_FastMo= toString(R1_FastMo), R1_Target= toString(R1_Target), R1_Reception= toString(R1_Reception), R2_Pos= toString(R2_Pos), R2_Route = toString(R2_Route), R2_FastMo= toString(R2_FastMo), R2_Target= toString(R2_Target), R2_Reception= toString(R2_Reception), R3_Pos= toString(R3_Pos), R3_Route = toString(R3_Route), R3_FastMo= toString(R3_FastMo), R3_Target= toString(R3_Target), R3_Reception= toString(R3_Reception), R4_Pos= toString(R4_Pos), R4_Route = toString(R4_Route), R4_FastMo= toString(R4_FastMo), R4_Target= toString(R4_Target), R4_Reception= toString(R4_Reception)) %>%
+  ungroup()
+
+```
+
+
+
+```{r}
+Route_Data <- Route_Data %>% 
+  mutate(L1_Pos = as.character(gsub(",", "", L1_Pos)))
+Route_Data <- Route_Data %>% 
+  mutate(L1_Route = as.character(gsub(",", "", L1_Route)))
+Route_Data <- Route_Data %>% 
+  mutate(L1_FastMo= as.character(gsub(",", "", L1_FastMo)))
+Route_Data <- Route_Data %>% 
+  mutate(L1_Target = as.character(gsub(",", "", L1_Target)))
+Route_Data <- Route_Data %>% 
+  mutate(L1_Reception = as.character(gsub(",", "", L1_Reception)))
+
+
+Route_Data <- Route_Data %>% 
+  mutate(L2_Pos = as.character(gsub(",", "", L2_Pos)))
+Route_Data <- Route_Data %>% 
+  mutate(L2_Route = as.character(gsub(",", "", L2_Route)))
+Route_Data <- Route_Data %>% 
+  mutate(L2_FastMo= as.character(gsub(",", "", L2_FastMo)))
+Route_Data <- Route_Data %>% 
+  mutate(L2_Target = as.character(gsub(",", "", L2_Target)))
+Route_Data <- Route_Data %>% 
+  mutate(L2_Reception = as.character(gsub(",", "", L2_Reception)))
+
+Route_Data <- Route_Data %>% 
+  mutate(L3_Pos = as.character(gsub(",", "", L3_Pos)))
+Route_Data <- Route_Data %>% 
+  mutate(L3_Route = as.character(gsub(",", "", L3_Route)))
+Route_Data <- Route_Data %>% 
+  mutate(L3_FastMo= as.character(gsub(",", "", L3_FastMo)))
+Route_Data <- Route_Data %>% 
+  mutate(L3_Target = as.character(gsub(",", "", L3_Target)))
+Route_Data <- Route_Data %>% 
+  mutate(L3_Reception = as.character(gsub(",", "", L3_Reception)))
+
+Route_Data <- Route_Data %>% 
+  mutate(L4_Pos = as.character(gsub(",", "", L4_Pos)))
+Route_Data <- Route_Data %>% 
+  mutate(L4_Route = as.character(gsub(",", "", L4_Route)))
+Route_Data <- Route_Data %>% 
+  mutate(L4_FastMo= as.character(gsub(",", "", L4_FastMo)))
+Route_Data <- Route_Data %>% 
+  mutate(L4_Target = as.character(gsub(",", "", L4_Target)))
+Route_Data <- Route_Data %>% 
+  mutate(L4_Reception = as.character(gsub(",", "", L4_Reception)))
+
+Route_Data <- Route_Data %>% 
+  mutate(R1_Pos = as.character(gsub(",", "", R1_Pos)))
+Route_Data <- Route_Data %>% 
+  mutate(R1_Route = as.character(gsub(",", "", R1_Route)))
+Route_Data <- Route_Data %>% 
+  mutate(R1_FastMo= as.character(gsub(",", "", R1_FastMo)))
+Route_Data <- Route_Data %>% 
+  mutate(R1_Target = as.character(gsub(",", "", R1_Target)))
+Route_Data <- Route_Data %>% 
+  mutate(R1_Reception = as.character(gsub(",", "", R1_Reception)))
+
+
+Route_Data <- Route_Data %>% 
+  mutate(R2_Pos = as.character(gsub(",", "", R2_Pos)))
+Route_Data <- Route_Data %>% 
+  mutate(R2_Route = as.character(gsub(",", "", R2_Route)))
+Route_Data <- Route_Data %>% 
+  mutate(R2_FastMo= as.character(gsub(",", "", R2_FastMo)))
+Route_Data <- Route_Data %>% 
+  mutate(R2_Target = as.character(gsub(",", "", R2_Target)))
+Route_Data <- Route_Data %>% 
+  mutate(R2_Reception = as.character(gsub(",", "", R2_Reception)))
+
+Route_Data <- Route_Data %>% 
+  mutate(R3_Pos = as.character(gsub(",", "", R3_Pos)))
+Route_Data <- Route_Data %>% 
+  mutate(R3_Route = as.character(gsub(",", "", R3_Route)))
+Route_Data <- Route_Data %>% 
+  mutate(R3_FastMo= as.character(gsub(",", "", R3_FastMo)))
+Route_Data <- Route_Data %>% 
+  mutate(R3_Target = as.character(gsub(",", "", R3_Target)))
+Route_Data <- Route_Data %>% 
+  mutate(R3_Reception = as.character(gsub(",", "", R3_Reception)))
+
+Route_Data <- Route_Data %>% 
+  mutate(R4_Pos = as.character(gsub(",", "", R4_Pos)))
+Route_Data <- Route_Data %>% 
+  mutate(R4_Route = as.character(gsub(",", "", R4_Route)))
+Route_Data <- Route_Data %>% 
+  mutate(R4_FastMo= as.character(gsub(",", "", R4_FastMo)))
+Route_Data <- Route_Data %>% 
+  mutate(R4_Target = as.character(gsub(",", "", R4_Target)))
+Route_Data <- Route_Data %>% 
+  mutate(R4_Reception = as.character(gsub(",", "", R4_Reception)))
+
+
+```
+
+
+```{r}
+Route_Data$L1_Pos <- gsub('\\s+', '', Route_Data$L1_Pos)
+Route_Data$L1_Route<- gsub('\\s+', '', Route_Data$L1_Route)
+Route_Data$L1_FastMo<- gsub('\\s+', '', Route_Data$L1_FastMo)
+Route_Data$L1_Target<- gsub('\\s+', '', Route_Data$L1_Target)
+Route_Data$L1_Reception<- gsub('\\s+', '', Route_Data$L1_Reception)
+
+Route_Data$L2_Pos <- gsub('\\s+', '', Route_Data$L2_Pos)
+Route_Data$L2_Route<- gsub('\\s+', '', Route_Data$L2_Route)
+Route_Data$L2_FastMo<- gsub('\\s+', '', Route_Data$L2_FastMo)
+Route_Data$L2_Target<- gsub('\\s+', '', Route_Data$L2_Target)
+Route_Data$L2_Reception<- gsub('\\s+', '', Route_Data$L2_Reception)
+
+Route_Data$L3_Pos <- gsub('\\s+', '', Route_Data$L3_Pos)
+Route_Data$L3_Route<- gsub('\\s+', '', Route_Data$L3_Route)
+Route_Data$L3_FastMo<- gsub('\\s+', '', Route_Data$L3_FastMo)
+Route_Data$L3_Target<- gsub('\\s+', '', Route_Data$L3_Target)
+Route_Data$L3_Reception<- gsub('\\s+', '', Route_Data$L3_Reception)
+
+Route_Data$L4_Pos <- gsub('\\s+', '', Route_Data$L4_Pos)
+Route_Data$L4_Route<- gsub('\\s+', '', Route_Data$L4_Route)
+Route_Data$L4_FastMo<- gsub('\\s+', '', Route_Data$L4_FastMo)
+Route_Data$L4_Target<- gsub('\\s+', '', Route_Data$L4_Target)
+Route_Data$L4_Reception<- gsub('\\s+', '', Route_Data$L4_Reception)
+
+Route_Data$R1_Pos <- gsub('\\s+', '', Route_Data$R1_Pos)
+Route_Data$R1_Route<- gsub('\\s+', '', Route_Data$R1_Route)
+Route_Data$R1_FastMo<- gsub('\\s+', '', Route_Data$R1_FastMo)
+Route_Data$R1_Target<- gsub('\\s+', '', Route_Data$R1_Target)
+Route_Data$R1_Reception<- gsub('\\s+', '', Route_Data$R1_Reception)
+
+Route_Data$R2_Pos <- gsub('\\s+', '', Route_Data$R2_Pos)
+Route_Data$R2_Route<- gsub('\\s+', '', Route_Data$R2_Route)
+Route_Data$R2_FastMo<- gsub('\\s+', '', Route_Data$R2_FastMo)
+Route_Data$R2_Target<- gsub('\\s+', '', Route_Data$R2_Target)
+Route_Data$R2_Reception<- gsub('\\s+', '', Route_Data$R2_Reception)
+
+Route_Data$R3_Pos <- gsub('\\s+', '', Route_Data$R3_Pos)
+Route_Data$R3_Route<- gsub('\\s+', '', Route_Data$R3_Route)
+Route_Data$R3_FastMo<- gsub('\\s+', '', Route_Data$R3_FastMo)
+Route_Data$R3_Target<- gsub('\\s+', '', Route_Data$R3_Target)
+Route_Data$R3_Reception<- gsub('\\s+', '', Route_Data$R3_Reception)
+
+Route_Data$R4_Pos <- gsub('\\s+', '', Route_Data$R4_Pos)
+Route_Data$R4_Route<- gsub('\\s+', '', Route_Data$R4_Route)
+Route_Data$R4_FastMo<- gsub('\\s+', '', Route_Data$R4_FastMo)
+Route_Data$R4_Target<- gsub('\\s+', '', Route_Data$R4_Target)
+Route_Data$R4_Reception<- gsub('\\s+', '', Route_Data$R4_Reception)
+
+
+```
+
+
+```{r}
+
+Route_Data$L1_FastMo <- sub("^$", 0, Route_Data$L1_FastMo)
+Route_Data$L1_Target <- sub("^$", 0, Route_Data$L1_Target)
+Route_Data$L1_Reception <- sub("^$", 0, Route_Data$L1_Reception)
+
+Route_Data$L2_FastMo <- sub("^$", 0, Route_Data$L2_FastMo)
+Route_Data$L2_Target <- sub("^$", 0, Route_Data$L2_Target)
+Route_Data$L2_Reception <- sub("^$", 0, Route_Data$L2_Reception)
+
+Route_Data$L3_FastMo <- sub("^$", 0, Route_Data$L3_FastMo)
+Route_Data$L3_Target <- sub("^$", 0, Route_Data$L3_Target)
+Route_Data$L3_Reception <- sub("^$", 0, Route_Data$L3_Reception)
+
+Route_Data$L4_FastMo <- sub("^$", 0, Route_Data$L4_FastMo)
+Route_Data$L4_Target <- sub("^$", 0, Route_Data$L4_Target)
+Route_Data$L4_Reception <- sub("^$", 0, Route_Data$L4_Reception)
+
+Route_Data$R1_FastMo <- sub("^$", 0, Route_Data$R1_FastMo)
+Route_Data$R1_Target <- sub("^$", 0, Route_Data$R1_Target)
+Route_Data$R1_Reception <- sub("^$", 0, Route_Data$R1_Reception)
+
+Route_Data$R2_FastMo <- sub("^$", 0, Route_Data$R2_FastMo)
+Route_Data$R2_Target <- sub("^$", 0, Route_Data$R2_Target)
+Route_Data$R2_Reception <- sub("^$", 0, Route_Data$R2_Reception)
+
+Route_Data$R3_FastMo <- sub("^$", 0, Route_Data$R3_FastMo)
+Route_Data$R3_Target <- sub("^$", 0, Route_Data$R3_Target)
+Route_Data$R3_Reception <- sub("^$", 0, Route_Data$R3_Reception)
+
+Route_Data$R4_FastMo <- sub("^$", 0, Route_Data$R4_FastMo)
+Route_Data$R4_Target <- sub("^$", 0, Route_Data$R4_Target)
+Route_Data$R4_Reception <- sub("^$", 0, Route_Data$R4_Reception)
+
+
+```
+
+```{r}
+#Export Route Data for Vlookup
+
+write.csv(Route_Data, file = "~/Desktop/Football/AnalyticsChallenge2021-main/Data/Route_Data.csv", row.names = FALSE)
+
+```
+
+```{r}
+#Read in manipulated Vlookup data
+
+Route_Data<- read.csv("~/Desktop/Football/AnalyticsChallenge2021-main/Data/Route_Data.csv")
+Route_Data<- Route_Data %>%
+  select(GameID, EventID, L1_Pos, L1_Route_Real, L1_FastMo, L1_Target, L1_Reception, L2_Pos, L2_Route_Real, L2_FastMo, L2_Target, L2_Reception, L3_Pos, L3_Route_Real, L3_FastMo, L3_Target, L3_Reception, L4_Pos, L4_Route_Real, L4_FastMo, L4_Target, L4_Reception, R1_Pos, R1_Route_Real, R1_FastMo, R1_Target, R1_Reception, R2_Pos, R2_Route_Real, R2_FastMo, R2_Target, R2_Reception, R3_Pos, R3_Route_Real, R3_FastMo, R3_Target, R3_Reception, R4_Pos, R4_Route_Real, R4_FastMo, R4_Target, R4_Reception)
+
+
+colnames(Route_Data)[which(names(Route_Data) == "L1_Route_Real")] <- "L1_Route"
+colnames(Route_Data)[which(names(Route_Data) == "L2_Route_Real")] <- "L2_Route"
+colnames(Route_Data)[which(names(Route_Data) == "L3_Route_Real")] <- "L3_Route"
+colnames(Route_Data)[which(names(Route_Data) == "L4_Route_Real")] <- "L4_Route"
+colnames(Route_Data)[which(names(Route_Data) == "R1_Route_Real")] <- "R1_Route"
+colnames(Route_Data)[which(names(Route_Data) == "R2_Route_Real")] <- "R2_Route"
+colnames(Route_Data)[which(names(Route_Data) == "R3_Route_Real")] <- "R3_Route"
+colnames(Route_Data)[which(names(Route_Data) == "R4_Route_Real")] <- "R4_Route"
+
+```
+
+```{r}
+#Counting Players on Left Side of Center
+Route_Data$L1_Count <- ifelse(grepl("WR", Route_Data$L1_Pos, ignore.case = T), 1, 
+         ifelse(grepl("TE", Route_Data$L1_Pos, ignore.case = T), 1, ifelse(grepl("RB", Route_Data$L1_Pos, ignore.case = T), 1, 0)))
+Route_Data$L2_Count <- ifelse(grepl("WR", Route_Data$L2_Pos, ignore.case = T), 1, 
+         ifelse(grepl("TE", Route_Data$L2_Pos, ignore.case = T), 1, ifelse(grepl("RB", Route_Data$L2_Pos, ignore.case = T), 1, 0)))
+Route_Data$L3_Count <- ifelse(grepl("WR", Route_Data$L3_Pos, ignore.case = T), 1, 
+         ifelse(grepl("TE", Route_Data$L3_Pos, ignore.case = T), 1, ifelse(grepl("RB", Route_Data$L3_Pos, ignore.case = T), 1, 0)))
+Route_Data$L4_Count <- ifelse(grepl("WR", Route_Data$L4_Pos, ignore.case = T), 1, 
+         ifelse(grepl("TE", Route_Data$L4_Pos, ignore.case = T), 1, ifelse(grepl("RB", Route_Data$L4_Pos, ignore.case = T), 1, 0)))
+
+
+#Counting Players on Right Side of Center
+Route_Data$R1_Count <- ifelse(grepl("WR", Route_Data$R1_Pos, ignore.case = T), 1, 
+         ifelse(grepl("TE", Route_Data$R1_Pos, ignore.case = T), 1, ifelse(grepl("RB", Route_Data$R1_Pos, ignore.case = T), 1, 0)))
+Route_Data$R2_Count <- ifelse(grepl("WR", Route_Data$R2_Pos, ignore.case = T), 1, 
+         ifelse(grepl("TE", Route_Data$R2_Pos, ignore.case = T), 1, ifelse(grepl("RB", Route_Data$R2_Pos, ignore.case = T), 1, 0)))
+Route_Data$R3_Count <- ifelse(grepl("WR", Route_Data$R3_Pos, ignore.case = T), 1, 
+         ifelse(grepl("TE", Route_Data$R3_Pos, ignore.case = T), 1, ifelse(grepl("RB", Route_Data$R3_Pos, ignore.case = T), 1, 0)))
+Route_Data$R4_Count <- ifelse(grepl("WR", Route_Data$R4_Pos, ignore.case = T), 1, 
+         ifelse(grepl("TE", Route_Data$R4_Pos, ignore.case = T), 1, ifelse(grepl("RB", Route_Data$R4_Pos, ignore.case = T), 1, 0)))
+
+
+
+```
+
+
+```{r}
+#Summing Count of Left and Right
+
+Route_Data$Left<- Route_Data$L1_Count+ Route_Data$L2_Count+ Route_Data$L3_Count+ Route_Data$L4_Count
+Route_Data$Right<- Route_Data$R1_Count+ Route_Data$R2_Count+ Route_Data$R3_Count+ Route_Data$R4_Count
+
+#Adding Formation Column
+
+Route_Data$Formation<- print(paste(Route_Data$Left, "x",  Route_Data$Right))
+
+
+Route_Data<- Route_Data %>%
+  select(GameID, EventID, L1_Pos, L1_Route, L1_FastMo, L1_Target, L1_Reception, L2_Pos, L2_Route, L2_FastMo, L2_Target, L2_Reception, L3_Pos, L3_Route, L3_FastMo, L3_Target, L3_Reception, L4_Pos, L4_Route, L4_FastMo, L4_Target, L4_Reception, R1_Pos, R1_Route, R1_FastMo, R1_Target, R1_Reception, R2_Pos, R2_Route, R2_FastMo, R2_Target, R2_Reception, R3_Pos, R3_Route, R3_FastMo, R3_Target, R3_Reception, R4_Pos, R4_Route, R4_FastMo, R4_Target, R4_Reception, Formation, Route_Data$Left , Route_Data$Right)
+
+
+
+head(Route_Data)
+
+```
+```{r}
+Route_Data <- Route_Data %>% 
+  replace(.=="#N/A", "") # replace with NA
+head(Route_Data)
+```
+
+
+```{r}
+Route_Data<- Route_Data%>% 
+  mutate_at('L1_FastMo', as.numeric) %>% 
+  mutate_at('L1_Target', as.numeric) %>%
+  mutate_at("L1_Reception", as.numeric) %>%
+  mutate_at('L2_FastMo', as.numeric) %>% 
+  mutate_at('L2_Target', as.numeric) %>%
+  mutate_at("L2_Reception", as.numeric) %>%
+  mutate_at('L3_FastMo', as.numeric) %>% 
+  mutate_at('L3_Target', as.numeric) %>%
+  mutate_at("L3_Reception", as.numeric) %>%
+  mutate_at('L4_FastMo', as.numeric) %>% 
+  mutate_at('L4_Target', as.numeric) %>%
+  mutate_at("L4_Reception", as.numeric) %>%
+  mutate_at('R1_FastMo', as.numeric) %>% 
+  mutate_at('R1_Target', as.numeric) %>%
+  mutate_at("R1_Reception", as.numeric) %>%
+  mutate_at('R2_FastMo', as.numeric) %>% 
+  mutate_at('R2_Target', as.numeric) %>%
+  mutate_at("R2_Reception", as.numeric) %>%
+  mutate_at('R3_FastMo', as.numeric) %>% 
+  mutate_at('R3_Target', as.numeric) %>%
+  mutate_at("R3_Reception", as.numeric) %>%
+  mutate_at('R4_FastMo', as.numeric) %>% 
+  mutate_at('R4_Target', as.numeric) %>%
+  mutate_at("R4_Reception", as.numeric) 
+  
+```
+
+
+```{r}
+
+Route_Data$Routes_Left<- na.omit(paste(Route_Data$L1_Route, Route_Data$L2_Route, Route_Data$L3_Route, Route_Data$L4_Route, sep = "|"))
+
+Route_Data$Routes_Right <- na.omit(paste(Route_Data$R1_Route, Route_Data$R2_Route, Route_Data$R3_Route, Route_Data$R4_Route, sep = "|"))
+
+head(Route_Data)
+```
+    
+```{r}
+#write.csv(Route_Data, file = "~/Desktop/Football/AnalyticsChallenge2021-main/Data/Updated Routes.csv", row.names = FALSE)
+```
+    
+```{r}
+Merged_df<- read.csv("~/Desktop/Football/AnalyticsChallenge2021-main/Data/Final_Data.csv")
+```
+
+```{r}
+#Remove run plays
+
+Merged_df<- Merged_df %>%
+  filter(EventType != "rush") %>%
+  left_join(Merged_df, Route_Data, by = c("GameID" = "GameID", "EventID" = "EventID"))
+  
+Merged_df <- Merged_df %>% 
+  rename_at(
+    vars(ends_with(".y")),
+    ~str_replace(., "\\..$","")
+  ) %>% 
+  select_at(
+    vars(-ends_with(".x"))
+  )
+
+
+
+Merged_df<- Merged_df %>% 
+  mutate(Hash = ifelse(as.character(Hash) == 1, "L", as.character(Hash)))
+
+Merged_df<- Merged_df %>%
+  mutate(Hash = ifelse(as.character(Hash) == 2, "M", as.character(Hash)))
+
+Merged_df <- Merged_df%>%
+  mutate(Hash = ifelse(as.character(Hash) == 3, "R", as.character(Hash)))
+
+```
+
+  filter((all_combos != "|||") & (all_combos != "In|||") & (all_combos != "Vert|||") & (all_combos != "Drag|||") & (all_combos != "Out|||") & (all_combos != "Slant|||") & (all_combos != "Blocking|||") & (all_combos != "Comeback|||") & (all_combos != "Corner|||") & (all_combos != "Post|||") & (all_combos != "Curl|||") & (all_combos !="|Drag||") & (all_combos!="Blocking|Blocking||") & (all_combos != "Dbl|||") & (all_combos != "Blocking|Blocking|Blocking|") & (all_combos !="|In||") & (all_combos !="|Out||")) %>%
+
+
+```{r}
+Merged_df %>% 
+  group_by(all_combos) %>% 
+  summarize(count=n()) %>%
+  arrange(desc(count))
+
+
+```
+```{r}
+#Make dummy variable for Targeted Motion Player, Targeted Inside (Receiever at 2, 3, or 4), Targeted Position (leave out FB position) 
+
+Merged_df$Targeted_Motion <- ifelse(
+    ( 
+        ((Merged_df$L1_FastMo == 1) & (Merged_df$L1_Target == 1)) | 
+        ((Merged_df$L2_FastMo == 1) & (Merged_df$L2_Target == 1)) |
+        ((Merged_df$L3_FastMo == 1) & (Merged_df$L3_Target == 1)) |
+        ((Merged_df$L4_FastMo == 1) & (Merged_df$L4_Target == 1)) |
+        ((Merged_df$R1_FastMo == 1) & (Merged_df$R1_Target == 1)) | 
+        ((Merged_df$R2_FastMo == 1) & (Merged_df$R2_Target == 1)) |
+        ((Merged_df$R3_FastMo == 1) & (Merged_df$R3_Target == 1)) |
+        ((Merged_df$R4_FastMo == 1) & (Merged_df$R4_Target == 1))
+       ),                                     
+    1,  # if condition is met, put 1
+    0  # else put 0
+)
+
+
+Merged_df$Targeted_Inside <- ifelse(
+    ( 
+        (Merged_df$L2_Target == 1) |
+        (Merged_df$L3_Target == 1) |
+        (Merged_df$L4_Target == 1) |
+        (Merged_df$R2_Target == 1) |
+        (Merged_df$R3_Target == 1) |
+        (Merged_df$R4_Target == 1)
+          ),                                     
+    1,  # if condition is met, put 1
+    0  # else put 0
+)
+
+Merged_df$Targeted_WR <- ifelse(
+    ( 
+      ((Merged_df$L1_Pos == "WR") & (Merged_df$L1_Target == 1)) |
+      ((Merged_df$L2_Pos == "WR") & (Merged_df$L2_Target == 1)) |
+      ((Merged_df$L3_Pos == "WR") & (Merged_df$L3_Target == 1)) |
+      ((Merged_df$L4_Pos == "WR") & (Merged_df$L4_Target == 1)) |
+      ((Merged_df$R1_Pos == "WR") & (Merged_df$R1_Target == 1)) |
+      ((Merged_df$R2_Pos == "WR") & (Merged_df$R2_Target == 1)) |
+      ((Merged_df$R3_Pos == "WR") & (Merged_df$R3_Target == 1)) |
+      ((Merged_df$R4_Pos == "WR") & (Merged_df$R4_Target == 1)) 
+         ),                                     
+    1,  # if condition is met, put 1
+    0  # else put 0
+)
+
+
+Merged_df$Targeted_TE <- ifelse(
+    ( 
+      ((Merged_df$L1_Pos == "TE") & (Merged_df$L1_Target == 1)) |
+      ((Merged_df$L2_Pos == "TE") & (Merged_df$L2_Target == 1)) |
+      ((Merged_df$L3_Pos == "TE") & (Merged_df$L3_Target == 1)) |
+      ((Merged_df$L4_Pos == "TE") & (Merged_df$L4_Target == 1)) |
+      ((Merged_df$R1_Pos == "TE") & (Merged_df$R1_Target == 1)) |
+      ((Merged_df$R2_Pos == "TE") & (Merged_df$R2_Target == 1)) |
+      ((Merged_df$R3_Pos == "TE") & (Merged_df$R3_Target == 1)) |
+      ((Merged_df$R4_Pos == "TE") & (Merged_df$R4_Target == 1)) 
+         ),                                     
+    1,  # if condition is met, put 1
+    0  # else put 0
+)
+
+
+Merged_df$Targeted_RB <- ifelse(
+    ( 
+      ((Merged_df$L1_Pos == "RB") & (Merged_df$L1_Target == 1)) |
+      ((Merged_df$L2_Pos == "RB") & (Merged_df$L2_Target == 1)) |
+      ((Merged_df$L3_Pos == "RB") & (Merged_df$L3_Target == 1)) |
+      ((Merged_df$L4_Pos == "RB") & (Merged_df$L4_Target == 1)) |
+      ((Merged_df$R1_Pos == "RB") & (Merged_df$R1_Target == 1)) |
+      ((Merged_df$R2_Pos == "RB") & (Merged_df$R2_Target == 1)) |
+      ((Merged_df$R3_Pos == "RB") & (Merged_df$R3_Target == 1)) |
+      ((Merged_df$R4_Pos == "RB") & (Merged_df$R4_Target == 1)) 
+         ),                                     
+    1,  # if condition is met, put 1
+    0  # else put 0
+)
+
+Merged_df$Targeted_FB <- ifelse(
+    ( 
+      ((Merged_df$L1_Pos == "FB") & (Merged_df$L1_Target == 1)) |
+      ((Merged_df$L2_Pos == "FB") & (Merged_df$L2_Target == 1)) |
+      ((Merged_df$L3_Pos == "FB") & (Merged_df$L3_Target == 1)) |
+      ((Merged_df$L4_Pos == "FB") & (Merged_df$L4_Target == 1)) |
+      ((Merged_df$R1_Pos == "FB") & (Merged_df$R1_Target == 1)) |
+      ((Merged_df$R2_Pos == "FB") & (Merged_df$R2_Target == 1)) |
+      ((Merged_df$R3_Pos == "FB") & (Merged_df$R3_Target == 1)) |
+      ((Merged_df$R4_Pos == "FB") & (Merged_df$R4_Target == 1)) 
+         ),                                     
+    1,  # if condition is met, put 1
+    0  # else put 0
+)
+
+
+```
+
+
+```{r}
+#Merged_df$yards_after_catch <- case_when(Merged_df$yards_after_catch  == NaN ~ as.numeric(0))
+```
+
+
+```{r}
+Route_Data_Backed<- Merged_df %>%
+  filter((StartYard %in% (1:20)) & (SideOfField == "Own"))
+
+Route_Data_Own21<- Merged_df %>%
+  filter((StartYard %in% (21:39)) & (SideOfField == "Own"))
+
+Route_Data_MidField<- Merged_df %>%
+  filter((StartYard %in% (40:50)) & ((SideOfField == "Own") | (SideOfField == "Oppo")))
+
+Route_Data_Shot<- Merged_df %>%
+  filter((StartYard %in% (21:39)) & (SideOfField == "Oppo"))
+
+Route_Data_HighRed<- Merged_df %>%
+  filter((StartYard %in% (11:20)) & (SideOfField == "Oppo"))
+
+Route_Data_LowRed<- Merged_df %>%
+  filter((StartYard %in% (1:10)) & (SideOfField == "Oppo"))
+
+```
+
+
+```{r}
+ModelWPA_BackedUp<-  lm(EPA ~ DropType+ + yards_after_catch+ all_combos + ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR, data = Route_Data_Backed)
+summary(ModelWPA_BackedUp)
+
+
+```
+
+```{r}
+ModelWPA_Own21<-  lm(wpa ~ DropType+ + yards_after_catch+ all_combos + ThrowDepth + Targeted_Inside + Targeted_RB + Targeted_TE+ Targeted_WR, data = Route_Data_Own21)
+summary(ModelWPA_Own21)
+
+
+```
+
+```{r}
+ModelWPA_Mid<-  lm(wpa ~ DropType+ + yards_after_catch+ all_combos + ThrowDepth + Targeted_Inside + Targeted_RB + Targeted_TE+ Targeted_WR, data = Route_Data_MidField)
+summary(ModelWPA_Mid)
+
+```
+
+
+```{r}
+ModelWPA_Shot<-  lm(wpa ~ DropType+ + yards_after_catch+ all_combos + ThrowDepth + Targeted_Inside + Targeted_RB + Targeted_TE+ Targeted_WR, data = Route_Data_Shot)
+summary(ModelWPA_Shot)
+
+```
+
+
+```{r}
+ModelWPA_HighRed<-  lm(wpa ~ DropType+ + yards_after_catch+ all_combos + ThrowDepth + Targeted_Inside + Targeted_RB + Targeted_TE+ Targeted_WR, data = Route_Data_HighRed)
+summary(ModelWPA_HighRed)
+
+```
+
+
+
+```{r}
+ModelWPA_LowRed<-  lm(wpa ~ DropType+ + yards_after_catch+ all_combos + ThrowDepth + Targeted_Inside + Targeted_RB + Targeted_TE+ Targeted_WR, data = Route_Data_LowRed)
+summary(ModelWPA_LowRed)
+
+```
+
+```{r}
+#Create Columns for Combinations
+
+Merged_df$Routes_Left<- na.omit(paste(Merged_df$L1_Route, Merged_df$L2_Route, Merged_df$L3_Route, Merged_df$L4_Route, sep = "|"))
+Merged_df$Routes_Right <- na.omit(paste(Merged_df$R1_Route, Merged_df$R2_Route, Merged_df$R3_Route, Merged_df$R4_Route, sep = "|"))
+
+Merged_df<- Merged_df %>%
+  mutate(Curl_Curl = ifelse((Routes_Left == "Curl|Curl||") | (Routes_Right == "Curl|Curl||"), 1, 0),
+         Curl_Fade = ifelse((Routes_Left == "Curl|Fade||") | (Routes_Right == "Curl|Fade||"), 1, 0),
+         Fade_Out = ifelse((Routes_Left == "Facde|Out||") | (Routes_Right == "Fade|Out||"), 1, 0),
+         Slant_Slant = ifelse((Routes_Left == "Slant|Slant||") | (Routes_Right == "Slant|Slant||"), 1, 0),
+         Vert_Out = ifelse((Routes_Left == "Vert|Out||") | (Routes_Right == "Vert|Out||"), 1, 0),
+         Cross_Drag = ifelse((Routes_Left == "Cross|Drag||") | (Routes_Right == "Cross|Drag||"), 1, 0),
+         Curl_Flat = ifelse((Routes_Left == "Curl|Flat||") | (Routes_Right == "Curl|Flat||"), 1, 0),
+         Slant_Flat = ifelse((Routes_Left == "Slant|Flat||") | (Routes_Right == "Slant|Flat||"), 1, 0),
+         In_In = ifelse((Routes_Left == "In|In||") | (Routes_Right == "In|In||"), 1, 0),
+         Curl_Corner = ifelse((Routes_Left == "Curl|Corner||") | (Routes_Right == "Curl|Corner||"), 1, 0),
+         Fade_Out = ifelse((Routes_Left == "Fade|Out||") | (Routes_Right == "Fade|Out||"), 1, 0),
+         Out_Out = ifelse((Routes_Left == "Out|Out||") | (Routes_Right == "Out|Out||"), 1, 0),
+         Out_Curl = ifelse((Routes_Left == "Out|Curl||") | (Routes_Right == "	Curl|Curl||"), 1, 0),
+         Curl_Vert = ifelse((Routes_Left == "Curl|Vert||") | (Routes_Right == "Curl|Vert||"), 1, 0),
+         Curl_Fade = ifelse((Routes_Left == "Curl|Fade||") | (Routes_Right == "Curl|Fade||"), 1, 0),
+         Curl_In = ifelse((Routes_Left == "Curl|In||") | (Routes_Right == "Curl|In||"), 1, 0),
+         In_Drag = ifelse((Routes_Left == "In|Drag||") | (Routes_Right == "In|Drag||"), 1, 0),
+         Cvr_1 = ifelse(CoverageScheme == "Cover 1", 1, 0),
+         Cvr_2 = ifelse(CoverageScheme == "Cover 2", 1, 0),
+         Cvr_3 = ifelse(CoverageScheme == "Cover 3", 1, 0),
+         Cvr_4 = ifelse(CoverageScheme == "Cover 4", 1, 0),
+         Cvr_6 = ifelse(CoverageScheme == "Cover 6", 1, 0),
+         Cvr_Man = ifelse(CoverageScheme == "Man Cover 2", 1, 0),
+         Cvr_Cobo = ifelse(CoverageScheme == "Combination", 1, 0)
+         )
+
+
+```
+
+
+```{r}
+Cvr_1_df<- Merged_df %>%
+  filter(CoverageScheme == "Cover 1")
+
+Cvr_2_df<- Merged_df %>%
+  filter(CoverageScheme == "Cover 2")
+
+Cvr_3_df<- Merged_df %>%
+  filter(CoverageScheme == "Cover 3")
+
+Cvr_4_df<- Merged_df %>%
+  filter(CoverageScheme == "Cover 4")
+
+Cvr_6_df<- Merged_df %>%
+  filter(CoverageScheme == "Cover 6")
+
+Cvr_Combo_df<- Merged_df %>%
+  filter(CoverageScheme == "Combination")
+
+Cvr_Man_df<- Merged_df %>%
+  filter(CoverageScheme == "Man Cover 2")
+```
+
+
+Route_Data_Backed<- Merged_df %>%
+  filter((StartYard %in% (1:20)) & (SideOfField == "Own"))
+
+Route_Data_Own21<- Merged_df %>%
+  filter((StartYard %in% (21:39)) & (SideOfField == "Own"))
+
+Route_Data_MidField<- Merged_df %>%
+  filter((StartYard %in% (40:50)) & ((SideOfField == "Own") | (SideOfField == "Oppo")))
+
+Route_Data_Shot<- Merged_df %>%
+  filter((StartYard %in% (21:39)) & (SideOfField == "Oppo"))
+
+Route_Data_HighRed<- Merged_df %>%
+  filter((StartYard %in% (11:20)) & (SideOfField == "Oppo"))
+
+Route_Data_LowRed<- Merged_df %>%
+  filter((StartYard %in% (1:10)) & (SideOfField == "Oppo"))
+
+
+
+```{r}
+ModelEPA_Cvr_1<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Curl_Fade+ Fade_Out + Slant_Slant+ Vert_Out+ Cross_Drag+ Curl_Flat+ Slant_Flat + ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR, data = Cvr_1_df)
+summary(ModelEPA_Cvr_1)
+
+
+```
+
+
+```{r}
+ModelEPA_Cvr_2<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ In_In+ Slant_Slant+ Vert_Out+ Curl_Corner+  Curl_Flat+ Fade_Out+ Out_Out+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR, data = Cvr_2_df)
+summary(ModelEPA_Cvr_2)
+
+```
+
+
+```{r}
+ModelEPA_Cvr_3<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Out_Curl + In_In+ Slant_Slant+ Vert_Out+ Curl_Corner+  Curl_Flat+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR, data = Cvr_3_df)
+summary(ModelEPA_Cvr_3)
+```
+
+```{r}
+ModelEPA_Cvr_4<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Curl_In+ In_Drag + Slant_Slant+ Vert_Out+ Curl_Vert+  Curl_Flat+ Out_Curl+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR, data = Cvr_4_df)
+summary(ModelEPA_Cvr_4)
+```
+```{r}
+Route_Data_Backed<- Merged_df %>%
+  filter((StartYard %in% (1:20)) & (SideOfField == "Own"))
+
+Route_Data_Own21<- Merged_df %>%
+  filter((StartYard %in% (21:39)) & (SideOfField == "Own"))
+
+Route_Data_MidField<- Merged_df %>%
+  filter((StartYard %in% (40:50)) & ((SideOfField == "Own") | (SideOfField == "Oppo")))
+
+Route_Data_Shot<- Merged_df %>%
+  filter((StartYard %in% (21:39)) & (SideOfField == "Oppo"))
+
+Route_Data_HighRed<- Merged_df %>%
+  filter((StartYard %in% (11:20)) & (SideOfField == "Oppo"))
+
+Route_Data_LowRed<- Merged_df %>%
+  filter((StartYard %in% (1:10)) & (SideOfField == "Oppo"))
+
+```
+
+
+```{r}
+ModelEPA_BackedUp_1<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Curl_Fade+ Fade_Out + Slant_Slant+ Vert_Out+ Cross_Drag+ Curl_Flat+ Slant_Flat + ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_1, data = Route_Data_Backed)
+summary(ModelEPA_BackedUp_1)
+
+```
+
+```{r}
+ModelEPA_Own21_1<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Curl_Fade+ Fade_Out + Slant_Slant+ Vert_Out+ Cross_Drag+ Curl_Flat+ Slant_Flat + ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_1, data = Route_Data_Own21)
+summary(ModelEPA_Own21_1)
+
+```
+
+
+```{r}
+ModelEPA_Mid_1<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Curl_Fade+ Fade_Out + Slant_Slant+ Vert_Out+ Cross_Drag+ Curl_Flat+ Slant_Flat + ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_1, data = Route_Data_MidField)
+summary(ModelEPA_Mid_1)
+
+```
+
+```{r}
+ModelEPA_Shot_1<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Curl_Fade+ Fade_Out + Slant_Slant+ Vert_Out+ Cross_Drag+ Curl_Flat+ Slant_Flat + ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_1, data = Route_Data_Shot)
+summary(ModelEPA_Shot_1)
+
+```
+
+```{r}
+ModelEPA_HiRed_1<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Curl_Fade+ Fade_Out + Slant_Slant+ Vert_Out+ Cross_Drag+ Curl_Flat+ Slant_Flat + ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_1, data = Route_Data_HighRed)
+summary(ModelEPA_HiRed_1)
+```
+```{r}
+ModelEPA_Backed_2<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ In_In+ Slant_Slant+ Vert_Out+ Curl_Corner+  Curl_Flat+ Fade_Out+ Out_Out+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_2, data = Route_Data_Backed)
+summary(ModelEPA_Backed_2)
+```
+```{r}
+ModelEPA_Own21_2<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ In_In+ Slant_Slant+ Vert_Out+ Curl_Corner+  Curl_Flat+ Fade_Out+ Out_Out+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_2, data = Route_Data_Own21)
+summary(ModelEPA_Own21_2)
+```
+
+```{r}
+ModelEPA_Mid_2<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ In_In+ Slant_Slant+ Vert_Out+ Curl_Corner+  Curl_Flat+ Fade_Out+ Out_Out+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_2, data = Route_Data_MidField)
+summary(ModelEPA_Mid_2)
+```
+
+```{r}
+ModelEPA_Shot_2<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ In_In+ Slant_Slant+ Vert_Out+ Curl_Corner+  Curl_Flat+ Fade_Out+ Out_Out+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_2, data = Route_Data_Shot)
+summary(ModelEPA_Shot_2)
+```
+
+```{r}
+ModelEPA_HiRed_2<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ In_In+ Slant_Slant+ Vert_Out+ Curl_Corner+  Curl_Flat+ Fade_Out+ Out_Out+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_2, data = Route_Data_HighRed)
+summary(ModelEPA_HiRed_2)
+```
+
+```{r}
+ModelEPA_LowRed_2<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ In_In+ Slant_Slant+ Vert_Out+ Curl_Corner+  Curl_Flat+ Fade_Out+ Out_Out+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_2, data = Route_Data_LowRed)
+summary(ModelEPA_LowRed_2)
+```
+
+```{r}
+ModelEPA_Backed_3<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Out_Curl + In_In+ Slant_Slant+ Vert_Out+ Curl_Corner+  Curl_Flat+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR+ Cvr_3, data = Route_Data_Backed)
+summary(ModelEPA_Backed_3)
+```
+
+```{r}
+ModelEPA_Own21_3<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Out_Curl + In_In+ Slant_Slant+ Vert_Out+ Curl_Corner+  Curl_Flat+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR+ Cvr_3, data = Route_Data_Own21)
+summary(ModelEPA_Own21_3)
+```
+
+
+```{r}
+ModelEPA_Mid_3<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Out_Curl + In_In+ Slant_Slant+ Vert_Out+ Curl_Corner+  Curl_Flat+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR+ Cvr_3, data = Route_Data_MidField)
+summary(ModelEPA_Mid_3)
+```
+
+
+```{r}
+ModelEPA_Shot_3<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Out_Curl + In_In+ Slant_Slant+ Vert_Out+ Curl_Corner+  Curl_Flat+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR+ Cvr_3, data = Route_Data_Shot)
+summary(ModelEPA_Shot_3)
+```
+
+
+```{r}
+ModelEPA_HiRed_3<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Out_Curl + In_In+ Slant_Slant+ Vert_Out+ Curl_Corner+  Curl_Flat+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR+ Cvr_3, data = Route_Data_HighRed)
+summary(ModelEPA_HiRed_3)
+```
+
+```{r}
+ModelEPA_LowRed_3<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Out_Curl + In_In+ Slant_Slant+ Vert_Out+ Curl_Corner+  Curl_Flat+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR+ Cvr_3, data = Route_Data_LowRed)
+summary(ModelEPA_LowRed_3)
+```
+
+```{r}
+ModelEPA_Backed_4<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Curl_In+ In_Drag + Slant_Slant+ Vert_Out+ Curl_Vert+  Curl_Flat+ Out_Curl+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_4, data = Route_Data_Backed)
+summary(ModelEPA_Backed_4)
+```
+
+```{r}
+ModelEPA_Own21_4<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Curl_In+ In_Drag + Slant_Slant+ Vert_Out+ Curl_Vert+  Curl_Flat+ Out_Curl+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_4, data = Route_Data_Own21)
+summary(ModelEPA_Own21_4)
+```
+
+```{r}
+ModelEPA_Mid_4<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Curl_In+ In_Drag + Slant_Slant+ Vert_Out+ Curl_Vert+  Curl_Flat+ Out_Curl+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_4, data = Route_Data_MidField)
+summary(ModelEPA_Mid_4)
+```
+
+```{r}
+ModelEPA_Shot_4<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Curl_In+ In_Drag + Slant_Slant+ Vert_Out+ Curl_Vert+  Curl_Flat+ Out_Curl+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_4, data = Route_Data_Shot)
+summary(ModelEPA_Shot_4)
+```
+
+```{r}
+ModelEPA_HiRed_4<-  lm(EPA ~ DropType+ yards_after_catch+ Curl_Curl+ Curl_In+ In_Drag + Slant_Slant+ Vert_Out+ Curl_Vert+  Curl_Flat+ Out_Curl+ ThrowDepth + Targeted_Inside + RPO+ Shotgun+ Targeted_RB + Targeted_TE+ Targeted_WR + Cvr_4, data = Route_Data_HighRed)
+summary(ModelEPA_HiRed_4)
+```
+
+
+
+
+
+
+
+
+
