@@ -266,7 +266,7 @@ plt.show()
 
 
 
-![png](AnalyticsChallenge2021/Submissions/img/output_13_1.png)
+![png](img/output_13_1.png)
 
 
     Sample of High Preforming WRs
@@ -287,7 +287,7 @@ plt.show()
 
 
 
-![png](AnalyticsChallenge2021/Submissions/img/output_13_3.png)
+![png](img/output_13_3.png)
 
 
 Next, I wanted to classify players based on their specialities with the routes they run. i.e a player like Tyreek Hill would have a speciality as a player who is exceptional at running 'Long' routes like Streaks and Corner Post routes. The best receivers (like Tyreek Hill) may be classified as a specialist with multipe route types. The idea is if you are a specialist as a short route receiver, you are worth more running a short route compared to a long route.
@@ -337,7 +337,7 @@ plt.title('EPA for Different Receiver Positions for a given Coverage Scheme');
 ```
 
 
-![png](AnalyticsChallenge2021/Submissions/img/output_17_0.png)
+![png](img/output_17_0.png)
 
 
 # Most Popular Route Combinations
@@ -430,7 +430,7 @@ plt.title('Percentage of Attempts based on Route Length');
 ```
 
 
-![png](AnalyticsChallenge2021/Submissions/img/output_22_0.png)
+![png](img/output_22_0.png)
 
 
 Because there are so many combinations of possible routes, I chose to look at the combinations of route lengths; and then pick the best routes to replace the route lengths (i.e chose curl to replace a short route since it has the highest EPA for all short routes).
@@ -935,7 +935,7 @@ axes[5].set_title('First Down Rate');
 ```
 
 
-![png](AnalyticsChallenge2021/Submissions/img/output_37_0.png)
+![png](img/output_37_0.png)
 
 
 # Expected Yards ML Model
@@ -1143,7 +1143,7 @@ axes[9].set_title('Tampa 2');
 ```
 
 
-![png](AnalyticsChallenge2021/Submissions/img/output_44_0.png)
+![png](img/output_44_0.png)
 
 
 # First Down Prediction ML Model
@@ -1461,7 +1461,7 @@ axes[9].set_title('Tampa 2');
 ```
 
 
-![png](AnalyticsChallenge2021/Submissions/img/output_52_0.png)
+![png](img/output_52_0.png)
 
 
 # END
