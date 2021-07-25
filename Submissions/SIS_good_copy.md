@@ -173,7 +173,7 @@ for i, txt in enumerate(gb_routes['Route']):
 ```
 
 
-![png](AnalyticsChallenge2021/Submissions/img/output_9_0.png)
+![png](img/output_9_0.png)
 
 
 
