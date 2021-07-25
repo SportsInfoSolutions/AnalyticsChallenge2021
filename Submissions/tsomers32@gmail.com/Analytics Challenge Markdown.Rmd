@@ -1,0 +1,406 @@
+---
+title: "2021 SIS Analytics Challenge"
+author: "Travis Somers"
+date: "6/29/2021"
+output:
+  slidy_presentation: 
+    font_adjustment: -2
+  always_allow_html: true
+  ioslides_presentation: default
+  powerpoint_presentation: default
+---
+
+
+
+## The Challenge {.bigger}
+The task presented by Sports Info Solutions was twofold: 
+1. Identify the most common route combinations
+2. Identify those combinations that are most effective against each coverage  
+  
+At first this project seemed rather straightforward. However, every research opportunity has unforeseen difficulties, and this was certainly no different. Overall, the project served as an excellent learning opportunity for a stats nerd just delving deeper into football schematics,
+
+## Initial Count of Routes Run
+```{r initial counts, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center'}
+library(tidyverse)
+library(tidytext)
+library(rstanarm)
+library(reactable)
+library(igraph)
+library(widyr)
+library(ggraph)
+library(vctrs)
+pbp <- read_csv("Data/PlayByPlay.csv", na="NULL")
+skills <- read_csv("Data/SkillPositionPlayers.csv", na="NULL")
+skills$Order_OutsideToInside <- as.integer(skills$Order_OutsideToInside)
+skills2 <- skills %>% 
+  group_by(GameID, EventID) %>% 
+  mutate(SideOfCenterMod = case_when(grepl("Right", Route) & !grepl("Swing", Route)  ~ "R",
+                                   grepl("Left", Route) & !grepl("Swing", Route)  ~ "L",
+                                   TRUE ~ SideOfCenter),
+         RouteMod = str_remove_all(Route, " - Left| - Right|Chip - | |&|-"),
+         RouteMod = ifelse(RouteMod=="Go/Fly", "Go", RouteMod)) %>% 
+  inner_join(pbp %>% select(GameID, EventID, EventType, Hash)) %>% 
+  filter(grepl("pass", EventType)) %>% 
+  mutate(HashMod = case_when(Hash==1 ~ "L",
+                             Hash==2 ~ "M",
+                             Hash==3 ~ "R"))
+
+passIDs <- pbp %>% filter(grepl("pass", EventType) & !DropType %in% c("Spike", "Flea Flicker", "RB/WR Pass", "WR Reverse Pass", "Double Reverse Pass")) %>% select(GameID, EventID)
+
+
+cor_calc <- function(route){
+  counts <- skills2 %>% 
+    filter(!is.na(RouteMod)) %>% group_by(GameID, EventID, RouteMod) %>% count(sort=T) %>% ungroup()
+  
+  n11 <- counts %>% filter(RouteMod==route) %>% summarise(doubles = sum(ifelse(n > 1, 1, 0))) %>% pull(doubles)
+  n01 <- counts %>% filter(RouteMod==route) %>% summarise(singles = sum(ifelse(n == 1, 1, 0))) %>% pull(singles)
+  n00 <- nrow(counts %>% distinct(GameID, EventID)) - n11 - n01
+  
+  phi <- ((n11*n00) - (n01^2)) / ((n11+n01) * (n01 + n00))
+  return(phi)
+}
+
+
+double_calc <- function(route){
+  counts <- skills2 %>% 
+    filter(!is.na(RouteMod)) %>% group_by(GameID, EventID, RouteMod) %>% count(sort=T) %>% ungroup()
+  
+  n11 <- counts %>% filter(RouteMod==route) %>% summarise(doubles = sum(ifelse(n > 1, 1, 0))) %>% pull(doubles)
+  
+  return(n11)
+}
+
+selfRouteCor <- data.frame(item1 = unique(skills2$RouteMod), 
+                           item2 = unique(skills2$RouteMod), 
+                           correlation = map_dbl(unique(skills2$RouteMod), cor_calc))
+
+route_cors <- skills2 %>% 
+  group_by(GameID, EventID, RouteMod) %>% 
+  count() %>% 
+  ungroup() %>% 
+  select(GameID, EventID, RouteMod, n) %>% 
+  mutate(id = paste(GameID, EventID, sep='-')) %>% 
+  filter(!is.na(RouteMod) & RouteMod!="Blocking") %>% 
+  select(id, RouteMod, n) %>% 
+  pairwise_cor(RouteMod, id, value=n, sort=T)
+
+top12routes <- skills2 %>% 
+  filter(!is.na(RouteMod)) %>% group_by(RouteMod) %>% count(sort=T) %>% ungroup() %>% 
+  filter(RouteMod!="Blocking") %>% 
+  filter(row_number() <= 12)
+
+combineCor <- bind_rows(route_cors, selfRouteCor) %>% arrange(-correlation) %>% filter(item1!="Blocking" | item2 !="Blocking")
+
+reactable(skills2 %>% 
+            filter(OnFieldPosition!="QB" & IsBlocking==0 & RouteMod!="Blocking") %>% 
+            group_by(RouteMod) %>% 
+            count(sort=T) %>% 
+            ungroup() %>% 
+            filter(row_number() <= 12),
+          columns = list(
+            RouteMod = colDef("Route", width=150),
+            n = colDef("Count", width=150)),
+         defaultPageSize = 12)
+
+
+```
+
+
+
+## Text Analysis
+
+In order to identify common route combinations I decided to approach the challenge as a text-analysis project. A typical text-analysis will look for common word pairings and correlations. In this case, I decided to apply the same idea to look at common route pairs. The network graph here displays the full relationships between each route type with positive correlation.
+
+```{r network, echo=F, message=F, warning=F, fig.width = 10, fig.height=5, fig.align='center'}
+bigram_graph <- combineCor %>% filter(correlation> 0.01) %>% graph_from_data_frame()
+
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+set.seed(1)
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = correlation), show.legend = FALSE,
+                 arrow = a, end_cap = circle(.07, 'inches')) +
+  geom_node_point(color = "lightblue", size = 5) +
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+  theme_void()
+```
+
+## Network Observations {.bigger}
+
+- Run Fakes pair strongly with screen and crossing type routes
+    - This makes intuitive sense given the increased usage of both RPOs and Play-Action
+- Curl/Flat and Slant/Flat are two of the stronger correlations
+- Vertical routes frequently appear together (Go/Fade/Seam)
+    - Four Verts and 999 concepts 
+- Go's also commonly used as a 'run-off' for underneath screens
+
+The network graph can sometimes be hard to digest, and it doesn't demonstrate how frequently a route pairs with itself. 
+
+## Common pairings with 12 most frequent routes
+
+```{r common bars, echo=F, message=F, warning=F, fig.align='center', fig.width=8, fig.height=6}
+combineCor %>% 
+  filter(item1 %in% top12routes$RouteMod) %>% 
+  group_by(item1) %>% 
+  slice_max(correlation, n=5) %>% 
+  ungroup() %>% 
+  mutate(item2 = reorder_within(item2, correlation, item1)) %>% 
+  ungroup() %>% 
+  ggplot(aes(reorder_within(item2, correlation, item1), correlation)) +
+  geom_bar(stat="identity") +
+  facet_wrap(~ item1, scales="free", nrow=3) +
+  coord_flip() +
+  scale_x_reordered() +
+  theme(axis.text.x = element_blank()) +
+  ylab("Paired Route") +
+  xlab("Correlation in Route Pairs")
+```
+
+## Pairing Observations {.bigger}
+
+- Go routes function primarily as a way to clear space for underneath options
+- Slants and Curls frequently appear in pairs
+- Posts pair with outside vertical concepts or over another in-breaking route
+- Corner routes are commonly seen with crossers; likely due to Boot action
+
+## Narrowing Down Combinations {.bigger}
+
+Accounting for the multitude of possible combinations of routes complicated the ability to model and evaluate their effectiveness. Rather than going with these route combinations directly, my efforts focused on identifying common passing **concepts**. This involved a heavy dose of reading and research from a variety of resources. Some of the key sources in this research included:  
+- "https://bleacherreport.com/articles/2024638-nfl-101-introducing-the-basic-route-combinations"  
+- "https://bleacherreport.com/articles/2110604-nfl-101-introducing-the-basic-red-zone-route-combinations"  
+- "http://www.syedschemes.com/pass-concepts/"  
+- "http://smartfootball.com/"  
+- "https://weeklyspiral.com/"  
+
+
+```{r pass cleaner, echo=F, message=F, warning=F}
+passPlay4 <- readRDS("passPlay4.rds")
+
+passPlayModelDf <- passPlay4 %>% 
+  mutate(PassingDown = ifelse((Down==3 & ToGo > 3) | (Down==4 & ToGo > 3), 1, 0),
+         YAC = OffensiveYardage - ThrowDepth)
+
+                           
+
+
+```
+
+
+## Data Assumption
+
+For parsing things (and to save time), I limited the data to non-trick plays. This excluded looks like WR passes or flea-flickers. The rationale for this filtering is based on the assumption that these types of plays involve other factors and deception that likely dwarf the impact of the route combinations themselves. As such, these plays are likely a poor representation of route performance and may skew results. Designed screen passes were also omitted for similar reasons. On the defensive side, Screen and Prevent coverage schemes were omitted, as these don't provide useful information in evaluating passing concepts.
+After removing these plays, there remained slightly less than 17k plays. After applying concept classification, there were approximately 500 plays that involved combinations that would require exceedingly granular concept definitions. These concepts were bucketed into a category listed as "Other". The other ~16k plays were categorized based on play definitions from the resources listed on the previous slide. 
+
+## Most Common Pass Concepts
+
+```{r common concepts, echo=F, message=F, warning=F, fig.align='center'}
+reactable(passPlay4 %>% 
+  group_by(RouteConcept) %>% 
+  summarise(Count = n()) %>% 
+    ungroup() %>% arrange(-Count) %>% 
+    filter(row_number()<=20) %>% 
+    mutate(Definition = c("Dig or Deep Cross opposite of short in-working route (Drag, Over Ball or Jerk)",
+                          "A designed rollout paired with a Drag or Deep Cross working across the field",
+                          "Total of 3 vertical working routes on opposite sides and an underneath route from either side or RB",
+                          "Deep Cross from a slot receiver, and a vertical route on the opposite side",
+                          "Curl-Flat to one side, with any combination of a Curl or OverBall route to the other",
+                          "Any combination of a Curl, Over Ball, Flat, Swing, Whip or Quick route on both sides",
+                          "Same as Boot, but this time including a Beneath route",
+                          "A Deep Cross paired with a Post or Vertical, with a max of 3 routes on the play",
+                          "4 vertical stem routes",
+                          "At least 3 out-breaking routes working to the same sideline",
+                          "A Go, Fade or Seam on both sides of the field, paired with one Dig route",
+                          "Any combination of a Curl or Over Ball route on both sides",
+                          "A Vertical route paired with at least two out-breaking routes to the same side",
+                          "A Post on one side, a Dig or Deep Cross to the other, and an underneath drag",
+                          "Drag routes working from both sides, paired with a Dig or Deep Cross behind",
+                          "Any combination of a Slant, Flat, Quick, Swing or Whip route on both sides",
+                          "Crossing drag routes",
+                          "All out-breaking routes on one side paired with Curl-Flat concept to the other",
+                          "Curls to one side, and any combination of a Curl, Over Ball or Vertical route to the other",
+                          "Slant-Flat to one side with no routes to the other")),
+  columns = list(Definition = colDef(style = list(fontSize = 11)),
+                 RouteConcept = colDef(name = "Concept", width = 175, style = list(fontSize = 12)),
+                 Count = colDef(width = 100, style = list(fontSize=12))),
+  defaultPageSize = 20)
+
+```
+
+## Observations {.bigger}
+
+- In the initial route counts, Curl routes topped the list by a significant margin. For that reason, it's not surprising to see Curl and Curl-Flat concepts appear on this list.
+- Many of the top concepts involve receivers working to the same area of the field
+    - Can happen at varying depths to create multi-level reads (Shallow Cross, Flood, etc.)
+    - Can happen with intersecting routes to create conflict and traffic for defenders (Slant-Flat, Mesh, Deep Crossers, etc.)
+- It's fairly common to see a receiver running a vertical stretch simply to create space for other underneath routes
+- Deep Crossers are a popular route that are paired with a diverse range of other routes.
+
+
+
+
+## Deciphering Concept Value {.bigger}
+
+Evaluating play results in football is always tumultuous as confounding variables can muddle analyses. Deciphering the value of various pass concepts is no different. Generally, EPA has served as a productive evaluation metric for overall outcomes. As such, it was utilized as the target metric in my model. 
+
+Another encountered challenge in the modeling process stemmed from the varying sample sizes of pass concept and coverage scheme combinations. With such a large number of pass concept combinations, sample sizes can dwindle quickly for variations that are run infrequently. For this reason, I opted for a Bayesian model to better demonstrate any uncertainty around the evaluation results.
+
+## Model Structure
+
+```{r load model, echo=F, warning=F, message=F}
+passPlayModel <- readRDS("epamodel.rds")
+modelDf <- as.data.frame(passPlayModel)
+```
+
+The constructed model included a control variable for whether or not it was deemed to be a passing down. This variable was subjectively constructed, but ultimately deemed as 3rd or 4th down with at least 4 yards to gain for a first down. In addition, the model includes a variable for whether or not a pass was completed on the play. By including this variable, the model can parse how effective concepts are at avoiding overly negative plays (sacks, turnovers, etc.) against each coverage type.
+
+```{r model structure, eval=F, out.width="65%", out.height="80%"}
+passPlayModel <- stan_lmer(EPA ~ 1 + PassingDown + Completion + (1 + Completion | RouteConcept:CoverageScheme),
+                           data = passPlayModelDf,
+                           warmup=2000,
+                           iter=4500,
+                           chains=4,
+                           cores=4,
+                           prior = normal(location=0, scale=.75, autoscale=F),
+                           prior_intercept = normal(location=0, scale=.75, autoscale=F), QR=T)
+```
+
+## Interpreting Model Results {.bigger}
+
+In particular, I was most interested in two elements of the model: (1) the expected EPA for each Route Concept when a pass was not completed against a Coverage Scheme, (2) and the expected EPA when a pass was completed. The first element helps to identify concepts with high floor outcomes, or "safe" plays. The second element captures those plays that are especially damaging when they're successful for the offense. Combining the two gives us the overall effectiveness of a given Concept/Coverage interaction.
+
+## The "Safe" Plays
+
+
+<div style= "float:right;position: relative; top: -80px;">
+```{r intercept chart, echo=F, message=F, warning=F, fig.height = 6}
+interceptDf <- modelDf %>% 
+  pivot_longer(names(modelDf), names_to = "Parameter", values_to = "Samples") %>% 
+  filter(grepl("Concept:CoverageScheme", Parameter) & !grepl("Sigma", Parameter) & !grepl("Completion", Parameter)) %>% 
+  group_by(Parameter) %>% 
+  summarise(fifth = quantile(Samples, probs=c(.05)),
+            avg = mean(Samples),
+            ninetyfifth = quantile(Samples, probs=c(.95)),
+            greaterThanZero = sum(ifelse(Samples>0, 1, 0))/n()) %>% 
+  ungroup() %>% 
+  arrange(-avg) %>% 
+  mutate(Parameter = str_split(Parameter, "RouteConcept:CoverageScheme:", simplify=T)[, 2] %>% str_remove_all(., "]"))
+
+ggplot(data = interceptDf %>% filter(row_number()<=15),
+  aes(x = fct_reorder(Parameter, avg))) +
+  geom_errorbar(aes(ymin = fifth, ymax = ninetyfifth), width = .2, colour="blue", size = 1) +
+  geom_point(aes(y = avg), colour="red", size = 3) +
+  coord_flip() +
+  theme_minimal() +
+  ylab("Average EPA Estimate and 90% Credible Intervals") +
+  xlab("Concept:Coverage Scheme")
+
+```
+</div>
+
+The first chart shows the 15 pass concept vs coverage combinations that resulted in the highest expected outcomes when a pass was incomplete. We see "Boot" action concepts topping the charts against several coverage types. This makes intuitive sense as plays with rolling pockets generally simplify reads and avoid pressure. In addition, many of the other concepts are quick-hitting concepts like Curl-Flat or Slant-Flat concepts. Again, we'd expect these to do a good job of avoiding pressure and sacks.
+
+## The "Splash" Plays
+
+
+<div style= "float:right;position: relative; top: -80px;">
+```{r compeltion slope chart, echo=F, message=F, warning=F, fig.height=6}
+slopeDf <- modelDf %>% 
+         pivot_longer(names(modelDf), names_to = "Parameter", values_to = "Samples") %>% 
+         filter(grepl("Concept:CoverageScheme", Parameter) & !grepl("Sigma", Parameter) & grepl("Completion", Parameter)) %>% 
+         group_by(Parameter) %>% 
+         summarise(fifth = quantile(Samples, probs=c(.05)),
+                   avg = mean(Samples),
+                   ninetyfifth = quantile(Samples, probs=c(.95)),
+                   greaterThanZero = sum(ifelse(Samples>0, 1, 0))/n()) %>% 
+         ungroup() %>% 
+         arrange(-avg) %>% 
+         mutate(Parameter = str_split(Parameter, "RouteConcept:CoverageScheme:", simplify=T)[, 2] %>% str_remove_all(., "]"))
+
+
+ggplot(data = slopeDf %>% filter(row_number()<=15),
+       aes(x = fct_reorder(Parameter, avg))) +
+  geom_errorbar(aes(ymin = fifth, ymax = ninetyfifth), width = .2, colour="blue", size = 1) +
+  geom_point(aes(y = avg), colour="red", size = 3) +
+  coord_flip() +
+  theme_minimal() +
+  ylab("Average EPA Estimate and 90% Credible Intervals") +
+  xlab("Concept:Coverage Scheme")
+```
+</div>
+
+These are the plays that result in the highest expected EPA when a pass is completed. In this case, many of the results include crossing routes vs man coverage (Y-Cross:Cover 1, Mesh:Cover 0, Deep Crossers:Cover 1, etc.). Again, this result makes intuitive sense since a completion to a crossing route vs man coverage likely results in the opportunity for yards after the catch. We also see the Yankee concept here. Traditionally this play has been used to put the deep middle player in Cover 3 in conflict, so it's encouraging to see the results back up historical precedent.
+
+## Most Effective Overall
+
+Combining the elements of the two previous charts gives a sense for the "overall" expected outcome for each pass concept vs coverage. The top 15 are graphed below.
+
+```{r top 15 combinations, echo=F, message=F, warning=F, fig.align='center'}
+ggplot(data = 
+interceptDf %>% 
+  inner_join(slopeDf, by=c("Parameter"), suffix = c("_int", "_slope")) %>% 
+  mutate(combFifth = fifth_int + fifth_slope,
+         combAvg = avg_int + avg_slope,
+         combNinetyFifth = ninetyfifth_int + ninetyfifth_slope) %>% 
+  arrange(-combAvg) %>% 
+  filter(row_number() <= 15),
+aes(x = fct_reorder(Parameter, combAvg))) +
+  geom_errorbar(aes(ymin = combFifth, ymax = combNinetyFifth), colour="blue", width=.2, size = 1) +
+  geom_point(aes(y = combAvg), colour="red", size = 3) +
+  coord_flip() +
+  theme_minimal() +
+  xlab("Concept:Coverage Scheme") +
+  ylab("Average EPA Estimate and 90% Credible Interval")
+```
+
+
+## Most Effective Concepts vs Each Coverage Type
+
+```{r full concept vs coverage table, echo=F, message=F, warning=F}
+
+reactable(interceptDf %>% 
+  inner_join(slopeDf, by=c("Parameter"), suffix = c("_int", "_slope")) %>% 
+  mutate(combFifth = fifth_int + fifth_slope,
+         combAvg = avg_int + avg_slope,
+         combNinetyFifth = ninetyfifth_int + ninetyfifth_slope) %>% 
+  separate(Parameter, into = c("Concept", "Coverage"), sep = ":") %>% 
+  mutate(Concept = str_replace_all(Concept, "_", " "),
+         Coverage = str_replace_all(Coverage, "_", " ")) %>% 
+  group_by(Coverage) %>% 
+  arrange(-combAvg) %>% 
+  top_n(5) %>% 
+  select(Concept, Coverage) %>% 
+  filter(!Coverage %in% c("Prevent")) %>% 
+  pivot_wider(names_from = Coverage, values_from = Concept) %>% 
+  unnest() %>% 
+    select(`Cover 0`, `Cover 1`, `Cover 2`, `Man Cover 2`, `Tampa 2`, `Cover 3`, `Cover 4`, `Cover 6`, `Combination`, `Other`),
+  columns = list(
+    `Cover 0` = colDef(name = "Cover 0"),
+    `Cover 1` =  colDef(name = "Cover 1"),
+    `Cover 2` = colDef(name = "Cover 2"),
+    `Man Cover 2` = colDef(name = "Man Cover 2"),
+    `Tampa 2` = colDef(name = "Tampa 2"),
+    `Cover 3` = colDef(name = "Cover 3"),
+    `Cover 4` = colDef(name = "Cover 4"),
+    `Cover 6` = colDef(name = "Cover 6"),
+    `Combination` = colDef(name = "Combination"),
+    `Other` = colDef(name = "Other")
+  ))
+
+```
+
+## Takeaways {.bigger}
+
+- Successful concepts vs Cover 0/1 involve crossing routes and routes "rubbing" (Hi-Lo Mesh) or heavy vertical concepts
+    - While the vertical concepts were successful on average, they also had wider variances and ranges of outcomes
+- Successful concepts vs 2-High looks involved attacking the middle (Mills) or flooding the sideline at different levels (Sail, Vert-Out)
+- Pairing vertical concepts (particularly from the Seam) with Curl-Flat concepts was successful vs Cover 3
+- Slants also showed success against Cover 2/4 type looks
+- Deep Crossers continue to dominate, especially when paired with play-action
+
+## Recommendations for Future Research {.bigger}
+
+- While I aimed to properly identify pass concepts, there is no doubt I misclassified some. Without knowing the actual depth of routes run, it's hard to fully differentiate some concepts. Incorporating the analysis of a film-expert to properly identify and "cluster" pass concepts could improve results.
+- With such small sample sizes in some cases, many estimates had wide confidence intervals, limiting the overall interpretation of the result. Better clustering processes coupled with more data could lead to more conclusive outcomes.
+- Another approach would be to continue the text analysis by incorporating a topic model for automating the pass concept clustering process. I briefly delved into this area, but limited experience prevented me from providing any successful analysis. Computation time also become an issue as I sought to implement this approach.
+
+##
+
