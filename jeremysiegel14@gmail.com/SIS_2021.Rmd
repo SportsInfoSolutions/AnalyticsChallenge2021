@@ -1,0 +1,241 @@
+---
+title: "SIS Football Analytics Challenge 2021"
+author: "Jeremy Siegel"
+date: "7/7/2021"
+output: html_document
+---
+
+# Which route combinations were most popular in the NFL in 2020. Of these combinations, which perform best against each coverage type
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Start by gathering our data
+```{r}
+library(tidyverse)
+pbp <- read_csv(url("https://raw.githubusercontent.com/SportsInfoSolutions/AnalyticsChallenge2021/main/Data/PlayByPlay.csv"))
+
+players <- read_csv(url("https://raw.githubusercontent.com/SportsInfoSolutions/AnalyticsChallenge2021/main/Data/SkillPositionPlayers.csv"))
+
+```
+
+Assumption: Now we are going to combine routes that are the same type but different direction (ex: Swing Left and Swing Right)
+```{r}
+
+players <- players %>% 
+  mutate_at(vars(Route), ~case_when(
+    startsWith(., "Swing") ~ "Swing",
+    startsWith(., "Flat") ~ "Flat",
+    startsWith(., "Screen") ~ "Screen",
+    .  == "Chip" ~ "Blocking",
+    startsWith(., "Chip") ~ sub("Chip - ", "", .),
+    startsWith(., "Fade") ~ "Fade",
+    TRUE ~ .
+  )) %>% 
+  filter(!(Route %in% c("NULL", "Blocking")))
+```
+
+
+First, let's take a look at the routes that are most commonly used in general
+```{r}
+route_counts <- players %>% count(Route) %>%  
+arrange(desc(n))
+
+route_counts
+```
+Now we will find out which routes are used on the most percentage of plays. This is a slightly different exercise than the last one, since each route will only be counted once if it is used on a given play. For example, if a given play has four different receivers running a slant, slant will only be counted once, rather than four times
+```{r}
+nPlays <- nrow(unique(players %>% select(GameID, EventID)))
+players %>% select(GameID, EventID, Route) %>% 
+  unique() %>% 
+  group_by(Route) %>% 
+  summarise(usage_pct = n()/nPlays) %>% 
+  arrange(desc(usage_pct))
+  
+```
+
+The results here are similar but slightly different from the previous list. Flat routes may not be used as often as out routes by they are used on a higher percentage of plays
+
+Next we will divide each route into generic categories to see which family of routes are used most commonly, as identified by the route definitions on the SIS github
+
+```{r}
+short <- c("Curl", "Comeback", "Jerk", "Out", "Over Ball", "Whip")
+vertical <- c("Go/Fly", "Fade", "Fade - Back Shoulder",
+              "Seam", "Post", "Corner")
+crossing <- c("Drag", "Dig", "Deep Cross", "Slant")
+interior <- c("Angle", "Beneath", "Check & Release", "Chip",
+              "Flat", "Leak", "Swing", "Wheel")
+screen <- c("Beneath", "Bubble", "Quick", "Shovel", "Screen", "Jet Sweep Pass")
+
+double_move <- c("Corner Post", "Post Corner", "Hitch & Go",
+                 "Out & Up", "Sluggo", "Sitck-Nod")
+
+
+
+
+players <- players %>% mutate(
+ Family = case_when(
+   Route %in% short ~ "short",
+   Route %in% vertical ~ "vertical",
+   Route %in% crossing ~ "crossing",
+   Route %in% interior ~ "interior",
+   Route %in% screen ~ "screen",
+   Route %in% double_move ~ "double move",
+   TRUE ~ "NULL"
+ )) 
+
+players %>% 
+  filter(Family != "NULL") %>% 
+  count(Family) %>% 
+  arrange(desc(n))
+```
+
+
+Now we will find out how much the usage of each family of routes will increase (or decrease) the porbability of a completion against each coverage type
+```{r}
+
+pbp <- pbp %>% 
+  filter(!CoverageScheme %in% c("Spike", "Other", "NULL", "Screen")) %>% 
+   mutate_at(vars(Completion, OffensiveYardage, EPA, Attempt), as.numeric)
+  
+
+##Average completion pct against each coverage type
+
+averages <- pbp %>% 
+  group_by(CoverageScheme) %>% 
+  summarise(comp_pct = mean(Completion, na.rm = T))
+
+players <- players %>% filter(Family != "NULL")
+
+
+pbp_all <- pbp %>% 
+  inner_join(players, by = c("GameID", "EventID")) %>% 
+  mutate_at(vars(Family, CoverageScheme), as.factor)
+
+comp_mat <- matrix(NA, nrow = length(averages$CoverageScheme), ncol = length(levels(pbp_all$Family)),
+                   dimnames = list(
+                     levels(pbp_all$CoverageScheme),
+                     levels(pbp_all$Family)
+                   ))
+
+```
+
+This following matrix will represent each family's completion percentage against each route on a scale where 100 is average
+
+
+```{r}
+for(i in 1:length(averages$CoverageScheme)){
+  for(j  in 1:length(levels(pbp_all$Family))){
+    comp_mat[i,j] <- 100*(sum(pbp_all$Completion == 1 & pbp_all$CoverageScheme == averages$CoverageScheme[i] & 
+                            pbp_all$Family == levels(pbp_all$Family)[j], na.rm = T)/ sum(pbp_all$CoverageScheme == averages$CoverageScheme[i] & 
+                            pbp_all$Family == levels(pbp_all$Family)[j], na.rm = T))/
+      as.numeric(averages[i,2])
+      
+  }
+}
+comp_mat
+```
+
+The most successful route in terms of predicting a completion is the screen against prevent coverage schemes, as it results in a completion 57 percent more than an average play against such defense. This makes sense, as the screen involves a quick, easy completion for the offense and prevent defense will allow short completions.
+
+It seems as if the most extreme outcomes come from screen routes and prevent defenses. Let's see what happens if we use a different metric, such as yards per pass attempt
+
+```{r}
+
+
+
+averages <- pbp %>% 
+  group_by(CoverageScheme) %>% 
+  summarise(ypa = sum(OffensiveYardage * Attempt, na.rm =T)/
+              sum(Attempt, na.rm = T))
+
+
+for(i in 1:length(averages$CoverageScheme)){
+  for(j  in 1:length(levels(pbp_all$Family))){
+    comp_mat[i,j] <- 100*(sum(pbp_all$OffensiveYardage * pbp_all$Attempt * (pbp_all$CoverageScheme == averages$CoverageScheme[i]) *
+                            (pbp_all$Family == levels(pbp_all$Family)[j]), na.rm = T)/ sum( pbp_all$Attempt * (pbp_all$CoverageScheme == averages$CoverageScheme[i]) *
+                           (pbp_all$Family == levels(pbp_all$Family)[j]), na.rm = T))/
+      as.numeric(averages[i,2])
+      
+  }
+}
+comp_mat
+
+
+
+```
+Here, we have slightly different results as the double move is super effective against Combo coverage schemes an Cover 0. Meanwhile, interior routes perform poorly against Cover 0.
+
+Now let's try EPA per pass attempt
+```{r}
+averages <- pbp %>% 
+  group_by(CoverageScheme) %>% 
+  summarise(epa_pass = sum(EPA * Attempt, na.rm =T)/
+              sum(Attempt, na.rm = T))
+
+
+for(i in 1:length(averages$CoverageScheme)){
+  for(j  in 1:length(levels(pbp_all$Family))){
+    comp_mat[i,j] <- 100*(sum(pbp_all$EPA * pbp_all$Attempt * (pbp_all$CoverageScheme == averages$CoverageScheme[i]) *
+                            (pbp_all$Family == levels(pbp_all$Family)[j]), na.rm = T)/ sum( pbp_all$Attempt * (pbp_all$CoverageScheme == averages$CoverageScheme[i]) *
+                           (pbp_all$Family == levels(pbp_all$Family)[j]), na.rm = T))/
+      as.numeric(averages[i,2])
+      
+  }
+}
+comp_mat
+
+```
+Here, we have similar, but more extreme results from the YPA trial. For example, a double move performs an insane 511 percent above average against Combo coverage schemes.  
+
+
+## Final Answer
+
+The most effective route family against each coverage scheme:
+
+Combo: Double Move
+
+Cover 0: Double Move
+
+Cover 1: Crossing
+
+Cover 2: Double  Move
+
+Cover 3: Double Move
+
+Cover 4: Double Move
+
+Cover 6: Screen
+
+Man Cover 2: Screen
+
+Prevent: Screen
+
+Tampa 2: Screen
+
+
+The least effective route family against each coverage scheme:
+
+Combo: Screen
+
+Cover 0: Short
+
+Cover 1: Short
+
+Cover 2: Crossing
+
+Cover 3: Short
+
+Cover 4: Screen
+
+Cover 6: Double Move
+
+Man Cover 2: Double Move
+
+Prevent: Interior
+
+Tampa 2: Crossing
+
+
