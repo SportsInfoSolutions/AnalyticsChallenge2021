@@ -1,0 +1,7 @@
+---
+title: "SIS Analytics Challenge Markdown"
+author: "Travis Somers"
+date: "6/29/2021"
+output: html_document
+---
+32 total plays involved less than 5 eligible receivers. These were omitted.
