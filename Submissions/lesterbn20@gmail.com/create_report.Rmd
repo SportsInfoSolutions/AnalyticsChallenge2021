@@ -1,0 +1,90 @@
+---
+title: "SIS Football Analytics Challenge"
+author: "Brandon Lester"
+date: "7/25/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, fig.height = 8, fig.width = 11)
+objs <- readRDS("for_rmd.rds")
+```
+
+## Assumptions
+
+* Filter to plays that ended with a pass
+* Remove clear anomaly plays by drop types, players out of position, etc
+* Success on a given played defined by an EPA value greater than 0
+* Success rate defined by down was considered - 50% of yards on 1st, 70% on 2nd, 100% on 3rd or 4th
+* Categorized routes into a standard route tree
+  + Whip left as-is since it's unknown if the route goes toward the middle of the field of toward the sideline
+  + Chip then route was grouped as the route itself
+  + Picks and chips were labelled as a route of Blocking
+  + When aggregated, plays with a Screen route and at least one blockers was labeled as "Screen with Blockers"
+
+
+## Exploratory Data Analysis
+
+Receiver alignment on the field was aggregated and plotted against the coverage. The y-axis is the number of receivers on the wide or short side of the field. "3-2" means 3 receivers were out on the wide side and 2 on the short side. Color of the boxes indicate the relative success rate (EPA greater than 0) of an alignment against a coverage.
+
+```{r}
+objs$p_alignment_v_coverage
+```
+
+
+Breaking down receiver alignment and the assigned routes for each was explored. Overall, More routes are run by receivers on the wide side. Wide outs on either side have generally the same route distribution. Slot receivers on the wide side tend to have more deeper routes than slot receivers on the short side. While "In" routes are at the top for each side, it's followed up by streaks and posts for the wide side but flat routes and curls for the short side.
+
+```{r}
+objs$pgrid_routes
+```
+
+## Evaluation Method
+A random forest classifier was trained to predict a successful play given pre-snap information.
+
+The response value was binary based on a playing having a positive EPA value or not.
+
+Predictors used include information on:
+
+* Game clock
+* Down & distance
+* Field position
+* Offensive formation
+* Spread and Total Lines
+* Current Score
+* Season week
+* Weather
+
+The model was trained using data from weeks 1 through 12 and utilizing grid search hyperparameter tuning. Out-of-bag accuracy was 57.7%.
+
+The predictions from this model were compared to actual results and aggregated by route combinations and coverages. Success Over Expected was calculated as a percent increase or decrease in the base success rate for a given route combination against a given coverage.
+
+
+## Final Answers
+If a route combination vs a coverage occurred less than 10 times, it was filtered out.
+
+### Aggregated by Route Combinations
+```{r}
+DT::datatable(objs$rc_soe, options = list(pageLength = 25))
+```
+
+### Aggregated by Route Combinations and Coverages
+```{r}
+DT::datatable(objs$rc_cov_soe, options = list(pageLength = 25))
+```
+
+## Limitations and Future Analysis
+
+Time of course is a limiting factor. Between making time for this project as well as breaking down a topic that has so many *routes* into something manageable for the timeframe was a struggle.
+
+Not having tracking data is another common limitation. The ability to have the actual route paths, location of defenders in a given coverage, and more would have many benefits for determing route combination succcess.
+
+Future work ideas with the provided data and my progress include:
+
+* Further analysis on the Success Over Expected metric against other stats and data points
+* More fine tuning on the classification model - random forest was chosen as it generally does well with minimal tuning and doesn't have all the assumptions of other model types
+* Other methods of breaking down route combinations such as looking a 2 man and trips concepts
+* Diving more into throw depth by route
+  + Example application: route combination of a post and slant on the same side of the field - how does the spacing between these routes affect success?
+* Improving my visualization of alignments and routes against a given coverage
+  + Example application: use ggplot to plot a field with Xs & Os and coverage shells then color by success rate
+* Improving this R markdown report or using other methods of presentation
